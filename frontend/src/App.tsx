@@ -4,6 +4,7 @@ import { api } from './services/api';
 import { DemoBar } from './components/ui/DemoBar';
 import { TopBar } from './components/ui/TopBar';
 import { Sidebar } from './components/ui/Sidebar';
+import { LoginModal } from './components/ui/LoginModal';
 import { LandingPage } from './features/landing/LandingPage';
 import { StudentDashboard } from './features/student/StudentDashboard';
 import { QuizFlow } from './features/quiz/QuizFlow';
@@ -30,10 +31,18 @@ export function App() {
   const [isTakingQuiz, setIsTakingQuiz] = useState<boolean>(false);
   const [selectedSubjectSlug, setSelectedSubjectSlug] = useState<string>('mathematics');
   const [showDesignSystem, setShowDesignSystem] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [aiHealth, setAiHealth] = useState<any>(null);
 
   useEffect(() => {
+    // Check if active session exists
+    api.getMe().then((res) => {
+      if (res && res.user) {
+        setCurrentUser(res.user);
+      }
+    }).catch(() => {});
+
     // Load subjects
     api.getSubjects().then((res) => {
       if (res.subjects) setSubjects(res.subjects);
@@ -61,20 +70,34 @@ export function App() {
       else if (role === 'parent') setCurrentTab('summary');
       else setCurrentTab('learn');
     } catch {
-      // Offline fallback
-      const mockUser: User = {
-        id: `mock-${role}`,
+      setCurrentUser({
+        id: `demo-${role}`,
         role,
-        display_name: role === 'teacher' ? 'Ms. Akua Mensah' : (role === 'parent' ? 'Mr. Kwesi Appiah' : 'WhyWrong Admin'),
+        display_name: `Demo ${role.toUpperCase()}`,
+        email: `${role}@whywrong.ai`,
         student_code: role === 'student' ? 'STU-1001' : undefined,
-        email: `${role}@school.edu`,
         is_demo: true,
-      };
-      setCurrentUser(mockUser);
+      });
       if (role === 'teacher') setCurrentTab('dashboard');
       else if (role === 'parent') setCurrentTab('summary');
       else setCurrentTab('learn');
     }
+  };
+
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUser(user);
+    setIsTakingQuiz(false);
+    if (user.role === 'teacher') setCurrentTab('dashboard');
+    else if (user.role === 'parent') setCurrentTab('summary');
+    else setCurrentTab('learn');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch {}
+    setCurrentUser(null);
+    setIsTakingQuiz(false);
   };
 
   // If Design System view requested
@@ -113,6 +136,12 @@ export function App() {
           onStartLearning={() => handleSwitchRole('student')}
           onExploreTeacher={() => handleSwitchRole('teacher')}
           onExploreParent={() => handleSwitchRole('parent')}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+        />
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
         />
       </div>
     );
@@ -131,6 +160,8 @@ export function App() {
           user={currentUser}
           variant="teacher"
           onNavigateHome={() => setCurrentTab('dashboard')}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onLogout={handleLogout}
         />
         <div className="flex">
           <Sidebar
@@ -140,23 +171,22 @@ export function App() {
             className="hidden md:flex"
           />
           <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-            {currentTab === 'dashboard' || currentTab === 'classroom' || currentTab === 'misconceptions' ? (
-              <TeacherDashboard />
-            ) : currentTab === 'reports' ? (
-              <ReportPreviewPage />
-            ) : (
-              <TeacherDashboard />
-            )}
+            <TeacherDashboard />
           </main>
         </div>
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
       </div>
     );
   }
 
-  // 3. PARENT PORTAL (Light Studio)
+  // 3. PARENT PORTAL (Light / Balanced Studio)
   if (currentUser.role === 'parent') {
     return (
-      <div className="min-h-screen bg-[#F7F9FC]">
+      <div className="min-h-screen bg-[#F7F9FC] text-slate-800">
         <DemoBar
           currentUser={currentUser}
           onSwitchRole={handleSwitchRole}
@@ -166,18 +196,33 @@ export function App() {
           user={currentUser}
           variant="student"
           onNavigateHome={() => setCurrentTab('summary')}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onLogout={handleLogout}
         />
-        <main className="max-w-5xl mx-auto p-4 sm:p-8">
-          <ParentPortal />
-        </main>
+        <div className="flex">
+          <Sidebar
+            currentTab={currentTab}
+            onSelectTab={(tab) => setCurrentTab(tab)}
+            variant="student"
+            className="hidden md:flex"
+          />
+          <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
+            <ParentPortal />
+          </main>
+        </div>
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
       </div>
     );
   }
 
-  // 4. ADMIN VIEW (AI Provider Health & Security Audit)
+  // 4. ADMIN AI OPS
   if (currentUser.role === 'admin') {
     return (
-      <div className="min-h-screen bg-[#0B1020] text-white">
+      <div className="min-h-screen bg-[#0C1421] text-white">
         <DemoBar
           currentUser={currentUser}
           onSwitchRole={handleSwitchRole}
@@ -187,15 +232,23 @@ export function App() {
           user={currentUser}
           variant="teacher"
           onNavigateHome={() => setCurrentTab('admin')}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onLogout={handleLogout}
         />
-        <main className="max-w-5xl mx-auto p-6 sm:p-10 space-y-8">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#22D3EE] bg-[#22D3EE]/10 px-2.5 py-0.5 rounded-full border border-[#22D3EE]/20">
-              Administrator Console
-            </span>
-            <h1 className="text-3xl font-extrabold font-display text-white mt-2">
-              AI Provider Health & Security Audit
-            </h1>
+        <main className="max-w-6xl mx-auto p-4 sm:p-8 space-y-6">
+          <div className="flex items-center justify-between pb-6 border-b border-[#1E2D4A]">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#22D3EE] bg-[#22D3EE]/10 px-2.5 py-1 rounded-full">
+                System Administration
+              </span>
+              <h1 className="text-2xl font-bold font-display text-white mt-2">
+                WhyWrong AI Engine & Provider Diagnostics
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-slate-300 font-semibold">Active AI Router</span>
+            </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-6">
@@ -246,6 +299,11 @@ export function App() {
             </Card>
           </div>
         </main>
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
       </div>
     );
   }
@@ -265,6 +323,8 @@ export function App() {
           setIsTakingQuiz(false);
           setCurrentTab('home');
         }}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       <div className="flex flex-1">
@@ -305,6 +365,12 @@ export function App() {
           )}
         </main>
       </div>
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </div>
   );
 }

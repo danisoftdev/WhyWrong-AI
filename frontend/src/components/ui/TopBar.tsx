@@ -1,16 +1,21 @@
 import React from 'react';
 import type { User } from '../../types';
-import { Search, Bell, Sparkles } from 'lucide-react';
+import { Search, Bell, LogIn, LogOut } from 'lucide-react';
+import { Button } from './Button';
 
 interface TopBarProps {
   user: User | null;
   onNavigateHome?: () => void;
+  onOpenLogin?: () => void;
+  onLogout?: () => void;
   variant?: 'student' | 'teacher' | 'landing';
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   user,
   onNavigateHome,
+  onOpenLogin,
+  onLogout,
   variant = 'student',
 }) => {
   const isTeacher = variant === 'teacher';
@@ -57,7 +62,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Bell Notifications */}
         <button
           type="button"
@@ -70,7 +75,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="w-2 h-2 rounded-full bg-[#E5484D] absolute top-1.5 right-1.5" />
         </button>
 
-        {/* User Badge / Profile */}
+        {/* User Badge / Profile & Login / Logout Buttons */}
         {user ? (
           <div className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800">
             <div className="w-8 h-8 rounded-full bg-[#734DFD] text-white font-bold text-xs flex items-center justify-center shadow-sm">
@@ -78,13 +83,33 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
             <div className="hidden sm:block text-left">
               <p className="text-xs font-semibold leading-tight">{user.display_name}</p>
-              <p className="text-[10px] text-slate-400 capitalize">{user.role} {user.student_code ? `(${user.student_code})` : ''}</p>
+              <p className="text-[10px] text-slate-400 capitalize">
+                {user.role} {user.student_code ? `(${user.student_code})` : ''}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Sign Out"
+              className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/10 text-slate-500 hover:text-red-500 transition-colors ml-1"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         ) : (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#734DFD]/10 text-[#734DFD]">
-            Guest Mode
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#734DFD]/10 text-[#734DFD]">
+              Guest
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenLogin}
+              className="gap-1.5 text-xs font-bold py-1.5"
+            >
+              <LogIn className="w-3.5 h-3.5" /> Sign In
+            </Button>
+          </div>
         )}
       </div>
     </header>

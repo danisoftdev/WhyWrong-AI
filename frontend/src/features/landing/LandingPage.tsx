@@ -21,12 +21,14 @@ interface LandingPageProps {
   onStartLearning: () => void;
   onExploreTeacher: () => void;
   onExploreParent: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onStartLearning,
   onExploreTeacher,
   onExploreParent,
+  onOpenLogin,
 }) => {
   return (
     <div className="min-h-screen bg-[#0B1020] text-white selection:bg-[#734DFD] selection:text-white relative overflow-hidden">
@@ -55,7 +57,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={onStartLearning} className="border-white/20 text-white hover:bg-white/10">
+          <Button variant="outline" size="sm" onClick={onOpenLogin || onStartLearning} className="border-white/20 text-white hover:bg-white/10">
             Sign In
           </Button>
           <Button variant="gradient" size="sm" onClick={onStartLearning} className="shadow-lg shadow-[#734DFD]/25">

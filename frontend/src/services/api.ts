@@ -38,10 +38,16 @@ export const api = {
     }
   },
 
-  async login(email: string, password: string): Promise<{ user: User }> {
+  async login(identifier: string, password: string): Promise<{ user: User }> {
     return fetchApi('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        identifier,
+        email: identifier,
+        student_code: identifier,
+        password,
+        pin: password,
+      }),
     });
   },
 
