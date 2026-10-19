@@ -1,0 +1,22 @@
+﻿Options -Indexes
+RewriteEngine On
+
+# 1. Block access to hidden files and private folders
+RewriteRule (^|/)\.(?!well-known) - [F,L]
+RewriteRule ^private_app - [F,L]
+RewriteRule ^config - [F,L]
+
+# 2. Route API calls to front controller
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# 3. React SPA Fallback
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteRule ^ index.html [L]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options " nosniff\
+ Header always set Referrer-Policy \strict-origin-when-cross-origin\
+ Header always set X-Frame-Options \DENY\
+</IfModule>
