@@ -28,6 +28,7 @@ export function App() {
 
   const [currentTab, setCurrentTab] = useState<string>('learn');
   const [isTakingQuiz, setIsTakingQuiz] = useState<boolean>(false);
+  const [selectedSubjectSlug, setSelectedSubjectSlug] = useState<string>('mathematics');
   const [showDesignSystem, setShowDesignSystem] = useState<boolean>(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [aiHealth, setAiHealth] = useState<any>(null);
@@ -279,7 +280,10 @@ export function App() {
 
         <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
           {isTakingQuiz || currentTab === 'learn' ? (
-            <QuizFlow onFinish={() => setIsTakingQuiz(false)} />
+            <QuizFlow
+              subjectSlug={selectedSubjectSlug}
+              onFinish={() => setIsTakingQuiz(false)}
+            />
           ) : currentTab === 'progress' ? (
             <ProgressPage />
           ) : currentTab === 'graph' ? (
@@ -289,8 +293,14 @@ export function App() {
           ) : (
             <StudentDashboard
               subjects={subjects}
-              onSelectSubject={() => setIsTakingQuiz(true)}
-              onOpenQuickQuiz={() => setIsTakingQuiz(true)}
+              onSelectSubject={(slug) => {
+                setSelectedSubjectSlug(slug);
+                setIsTakingQuiz(true);
+              }}
+              onOpenQuickQuiz={() => {
+                setSelectedSubjectSlug('mathematics');
+                setIsTakingQuiz(true);
+              }}
             />
           )}
         </main>

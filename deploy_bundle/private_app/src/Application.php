@@ -67,7 +67,7 @@ class Application
         // Demo
         $r->post('/api/demo/session',      'DemoController@session',    roles: []);
 
-        // Subjects
+        // Subjects (public catalog for dashboard)
         $r->get('/api/subjects',           'SubjectController@list',    roles: []);
 
         // Attempts
