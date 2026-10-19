@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Role, User } from '../../types';
-import { Sparkles, User as UserIcon, GraduationCap, Users, Shield, Compass } from 'lucide-react';
+import { User as UserIcon, GraduationCap, Users, Shield, Compass, X } from 'lucide-react';
 
 interface DemoBarProps {
   currentUser: User | null;
@@ -13,6 +13,12 @@ export const DemoBar: React.FC<DemoBarProps> = ({
   onSwitchRole,
   onOpenDesignSystem,
 }) => {
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  if (isDismissed) {
+    return null;
+  }
+
   const roles: { role: Role; label: string; icon: React.ReactNode }[] = [
     { role: 'visitor', label: 'Visitor (Landing)', icon: <Compass className="w-3.5 h-3.5" /> },
     { role: 'student', label: 'Student (Kofi)', icon: <UserIcon className="w-3.5 h-3.5" /> },
@@ -22,16 +28,7 @@ export const DemoBar: React.FC<DemoBarProps> = ({
   ];
 
   return (
-    <div className="demo-bar w-full bg-[#0B1020] text-white border-b border-white/10 px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-3 sticky top-0 z-50 shadow-md">
-      <div className="flex items-center gap-2">
-        <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#734DFD]/20 text-[#22D3EE] font-bold tracking-wider uppercase text-[10px] border border-[#22D3EE]/30">
-          <Sparkles className="w-3 h-3 text-[#22D3EE]" /> NYLP Hackathon 2026 Demo Mode
-        </span>
-        <span className="hidden md:inline text-slate-400">
-          Click any role to test live:
-        </span>
-      </div>
-
+    <div className="demo-bar w-full bg-[#0B1020] text-white border-b border-white/10 px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-3 shadow-md relative z-50">
       <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
         {roles.map((r) => {
           const isActive = currentUser?.role === r.role || (!currentUser && r.role === 'visitor');
@@ -62,6 +59,17 @@ export const DemoBar: React.FC<DemoBarProps> = ({
           </button>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsDismissed(true)}
+        aria-label="Hide role bar"
+        title="Hide role bar"
+        className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-auto"
+      >
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 };
+

@@ -22,7 +22,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header
-      className={`h-16 px-6 flex items-center justify-between border-b sticky top-[37px] z-40 backdrop-blur-md ${
+      className={`h-16 px-6 flex items-center justify-between border-b sticky top-0 z-40 backdrop-blur-md ${
         isTeacher
           ? 'bg-[#0C1421]/90 border-[#1E2D4A] text-white'
           : 'bg-[#F7F9FC]/90 border-slate-200/80 text-slate-800'
