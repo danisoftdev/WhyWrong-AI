@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-midnight: #0B1020;
+    --bg-teacher: #0C1421;
+    --card-teacher: #111E38;
+    --surface-student: #F7F9FC;
+    --surface-sidebar: #F3F5FD;
+    --primary: #734DFD;
+    --primary-soft: #775DFC;
+    --accent-cyan: #22D3EE;
+    --success: #0BAA7B;
+    --warning: #F48B2C;
+    --danger: #E5484D;
+
+    /* Subject Pastels */
+    --pastel-math: #D9C2FC;
+    --pastel-phys: #D4FBE9;
+    --pastel-comp: #FDDFE6;
+    --pastel-chem: #E3F7E0;
+    --pastel-bio: #FEEACC;
+    --pastel-eng: #E2F1FE;
+    --pastel-geo: #FEF5D7;
+    --pastel-econ: #ECE0FC;
+    --pastel-hlth: #FFEBE5;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1E293B;
+    background-color: #F7F9FC;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Print CSS for PDF/Reports */
+@media print {
+  .no-print, header, nav, .demo-bar, footer {
+    display: none !important;
+  }
+  body, .printable-content {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .printable-card {
+    border: 1px solid #CBD5E1 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

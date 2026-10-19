@@ -1,0 +1,65 @@
+{
+  "subject": "computing",
+  "topic": "iteration_and_arrays",
+  "version": "1.0.0",
+  "misconceptions": [
+    {
+      "id": "misc-comp-off-by-one",
+      "label": "Off-by-one index error (Length vs Upper Bound)",
+      "explanation": "Assuming a 0-indexed array of length N has its last valid element at index N rather than N-1.",
+      "detector": {
+        "type": "array_boundary",
+        "pattern": "\\bindex\\s*=\\s*length\\b"
+      },
+      "counterexample": {
+        "statement": "If you have 3 items indexed [0, 1, 2], accessing index 3 tries to grab a 4th non-existent item, causing an IndexOutOfBounds error!",
+        "analogy": "Counting starts at zero: fingers 0, 1, 2 = 3 fingers total."
+      },
+      "worked_contrast": {
+        "incorrect_rule": "for i = 0 to array.length (inclusive)",
+        "correct_rule": "for i = 0 to array.length - 1 (or i < array.length)",
+        "explanation": "0-based indexing shifts all valid positions down by 1."
+      },
+      "probes": [
+        {
+          "id": "probe-comp-01",
+          "prompt": "For an array `let colors = ['red', 'green', 'blue']`, what does `colors[colors.length]` evaluate to?",
+          "options": [
+            { "id": "pc-opt-a", "text": "'blue'", "is_predicted_wrong": true },
+            { "id": "pc-opt-b", "text": "undefined / Error", "is_correct": true },
+            { "id": "pc-opt-c", "text": "'green'", "is_predicted_wrong": false },
+            { "id": "pc-opt-d", "text": "I'm not sure", "is_unsure": true }
+          ],
+          "predicted_wrong": "'blue'",
+          "rationale": "Believing `colors.length` is the last item confirms the off-by-one misconception."
+        }
+      ],
+      "practice_questions": [
+        {
+          "id": "prac-comp-01",
+          "prompt": "How many times does `for(let i=0; i < 5; i++)` run?",
+          "options": ["4 times", "5 times", "6 times", "0 times"],
+          "correct": "5 times"
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-comp-loop-01",
+      "prompt": "In Python or JavaScript, what is the index of the last element in an array with 5 items?",
+      "prompt_type": "text",
+      "difficulty": 1,
+      "options": [
+        { "id": "opt-a", "text": "5", "misconception_id": "misc-comp-off-by-one" },
+        { "id": "opt-b", "text": "4", "is_correct": true },
+        { "id": "opt-c", "text": "6", "misconception_id": null },
+        { "id": "opt-d", "text": "0", "misconception_id": null }
+      ],
+      "correct_answer": "opt-b",
+      "distractor_map": {
+        "opt-a": "misc-comp-off-by-one"
+      }
+    }
+  ]
+}

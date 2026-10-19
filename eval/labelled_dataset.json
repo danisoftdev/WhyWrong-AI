@@ -1,0 +1,134 @@
+[
+  {
+    "id": "item-math-01",
+    "subject": "mathematics",
+    "prompt": "1/3 + 1/4 = ?",
+    "selected_option_id": "opt-b",
+    "answer_text": "2/7",
+    "working_text": "1/3 + 1/4 = (1+1)/(3+4) = 2/7",
+    "distractor_map": {"opt-b": "misc-frac-add-across"},
+    "expected_misconception": "misc-frac-add-across",
+    "is_slip": false
+  },
+  {
+    "id": "item-math-02",
+    "subject": "mathematics",
+    "prompt": "1/2 + 1/3 = ?",
+    "selected_option_id": "opt-b",
+    "answer_text": "2/5",
+    "working_text": "1/2 + 1/3 = 2/5",
+    "distractor_map": {"opt-b": "misc-frac-add-across"},
+    "expected_misconception": "misc-frac-add-across",
+    "is_slip": false
+  },
+  {
+    "id": "item-math-03",
+    "subject": "mathematics",
+    "prompt": "Which comparison is TRUE?",
+    "selected_option_id": "opt-a",
+    "answer_text": "1/8 > 1/4",
+    "working_text": "8 is greater than 4 so 1/8 is bigger",
+    "distractor_map": {"opt-a": "misc-frac-larger-denom-larger"},
+    "expected_misconception": "misc-frac-larger-denom-larger",
+    "is_slip": false
+  },
+  {
+    "id": "item-math-04",
+    "subject": "mathematics",
+    "prompt": "1/5 + 2/5 = ?",
+    "selected_option_id": "opt-c",
+    "answer_text": "3/10",
+    "working_text": "added 5 and 5 to get 10",
+    "distractor_map": {"opt-c": "misc-frac-add-across"},
+    "expected_misconception": "misc-frac-add-across",
+    "is_slip": false
+  },
+  {
+    "id": "item-math-05",
+    "subject": "mathematics",
+    "prompt": "3/7 + 2/7 = ?",
+    "selected_option_id": "opt-d",
+    "answer_text": "6/7",
+    "working_text": "multiplied instead of added",
+    "distractor_map": {},
+    "expected_misconception": null,
+    "is_slip": true
+  },
+  {
+    "id": "item-phys-01",
+    "subject": "physics",
+    "prompt": "A spacecraft cruises through deep space with thrusters turned off. What happens to its speed?",
+    "selected_option_id": "opt-a",
+    "answer_text": "It slows down gradually and eventually halts",
+    "working_text": "force is needed to keep moving",
+    "distractor_map": {"opt-a": "misc-phys-force-velocity"},
+    "expected_misconception": "misc-phys-force-velocity",
+    "is_slip": false
+  },
+  {
+    "id": "item-phys-02",
+    "subject": "physics",
+    "prompt": "An astronaut throws a ball in deep vacuum space. What happens to the ball?",
+    "selected_option_id": "opt-d",
+    "answer_text": "It stops immediately when the force runs out",
+    "working_text": "force runs out after throw",
+    "distractor_map": {"opt-d": "misc-phys-force-velocity"},
+    "expected_misconception": "misc-phys-force-velocity",
+    "is_slip": false
+  },
+  {
+    "id": "item-phys-03",
+    "subject": "physics",
+    "prompt": "A car drives at constant 60 km/h on a straight road. What is the net horizontal force?",
+    "selected_option_id": "opt-a",
+    "answer_text": "60 N forward force",
+    "working_text": "force required for motion",
+    "distractor_map": {"opt-a": "misc-phys-force-velocity"},
+    "expected_misconception": "misc-phys-force-velocity",
+    "is_slip": false
+  },
+  {
+    "id": "item-phys-04",
+    "subject": "physics",
+    "prompt": "Calculate weight of 10kg mass where g=9.8 m/s^2",
+    "selected_option_id": "opt-c",
+    "answer_text": "980 N",
+    "working_text": "10 * 98",
+    "distractor_map": {},
+    "expected_misconception": null,
+    "is_slip": true
+  },
+  {
+    "id": "item-comp-01",
+    "subject": "computing",
+    "prompt": "In JavaScript, what is the index of the last element in an array with 5 items?",
+    "selected_option_id": "opt-a",
+    "answer_text": "5",
+    "working_text": "index = length = 5",
+    "distractor_map": {"opt-a": "misc-comp-off-by-one"},
+    "expected_misconception": "misc-comp-off-by-one",
+    "is_slip": false
+  },
+  {
+    "id": "item-comp-02",
+    "subject": "computing",
+    "prompt": "An array has 10 elements. Accessing array[10] will do what?",
+    "selected_option_id": "opt-a",
+    "answer_text": "Returns the 10th element",
+    "working_text": "index 10 is the 10th item",
+    "distractor_map": {"opt-a": "misc-comp-off-by-one"},
+    "expected_misconception": "misc-comp-off-by-one",
+    "is_slip": false
+  },
+  {
+    "id": "item-comp-03",
+    "subject": "computing",
+    "prompt": "What does a loop from 0 to 4 print?",
+    "selected_option_id": "opt-b",
+    "answer_text": "1, 2, 3, 4, 5",
+    "working_text": "started at 1 accidentally",
+    "distractor_map": {},
+    "expected_misconception": null,
+    "is_slip": true
+  }
+]

@@ -1,0 +1,66 @@
+{
+  "subject": "physics",
+  "topic": "forces_and_motion",
+  "version": "1.0.0",
+  "misconceptions": [
+    {
+      "id": "misc-phys-force-velocity",
+      "label": "Constant motion requires constant net force",
+      "explanation": "Believing that an object moving at a constant velocity in space or on ice must have a continuous applied force pushing it forward (Aristotelian misconception).",
+      "detector": {
+        "type": "keyword_force",
+        "pattern": "\\bforce\\s+(is\\s+needed|required|pushes)\\s+to\\s+keep\\s+moving\\b"
+      },
+      "counterexample": {
+        "statement": "Voyager 1 has traveled billions of kilometers outside our solar system with its engines completely turned off, yet it keeps flying at 61,000 km/h!",
+        "analogy": "Newton's First Law: Objects keep moving at constant velocity unless an external net force (like friction) stops them."
+      },
+      "worked_contrast": {
+        "incorrect_rule": "Velocity > 0 implies Net Force > 0",
+        "correct_rule": "Constant Velocity implies Net Force = 0; Force causes Acceleration, not velocity.",
+        "explanation": "On Earth, things slow down because friction opposes motion, not because motion 'runs out of force'."
+      },
+      "probes": [
+        {
+          "id": "probe-phys-01",
+          "prompt": "A hockey puck slides across frictionless ice at 10 m/s. What is the net horizontal force acting on it?",
+          "options": [
+            { "id": "pp-opt-a", "text": "10 N in the direction of motion", "is_predicted_wrong": true },
+            { "id": "pp-opt-b", "text": "0 N (Zero force)", "is_correct": true },
+            { "id": "pp-opt-c", "text": "Equal to its mass times 10", "is_predicted_wrong": true },
+            { "id": "pp-opt-d", "text": "I'm not sure", "is_unsure": true }
+          ],
+          "predicted_wrong": "10 N in the direction of motion",
+          "rationale": "Believing force equals speed confirms the misconception."
+        }
+      ],
+      "practice_questions": [
+        {
+          "id": "prac-phys-01",
+          "prompt": "An elevator moves upward at a steady constant speed. How does the cable tension compare to gravity?",
+          "options": ["Tension equals Gravity", "Tension is greater than Gravity", "Tension is less than Gravity", "No tension"],
+          "correct": "Tension equals Gravity"
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-phys-mot-01",
+      "prompt": "A spacecraft cruises through deep empty space with all thrusters switched off. What happens to its speed?",
+      "prompt_type": "text",
+      "difficulty": 2,
+      "options": [
+        { "id": "opt-a", "text": "It slows down gradually and eventually halts", "misconception_id": "misc-phys-force-velocity" },
+        { "id": "opt-b", "text": "It continues cruising at the exact same constant speed indefinitely", "is_correct": true },
+        { "id": "opt-c", "text": "It accelerates because there is no gravity", "misconception_id": null },
+        { "id": "opt-d", "text": "It stops immediately when the thruster shuts off", "misconception_id": "misc-phys-force-velocity" }
+      ],
+      "correct_answer": "opt-b",
+      "distractor_map": {
+        "opt-a": "misc-phys-force-velocity",
+        "opt-d": "misc-phys-force-velocity"
+      }
+    }
+  ]
+}

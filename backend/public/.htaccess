@@ -1,0 +1,36 @@
+RewriteEngine On
+
+# ── Security: block sensitive files ──────────────────────────────
+RewriteRule ^\.env$ - [F,L]
+RewriteRule ^\.env\. - [F,L]
+RewriteRule ^composer\.(json|lock)$ - [F,L]
+RewriteRule ^(config|logs|migrations|seeds|src|tests|vendor)/ - [F,L]
+
+# ── API routes → PHP front controller ────────────────────────────
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteRule ^ index.php [QSA,L]
+
+# ── Static assets (let Apache serve them directly) ───────────────
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# ── SPA fallback (all other routes → React index.html) ───────────
+RewriteRule ^ index.php [QSA,L]
+
+# ── Security headers ─────────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self';"
+</IfModule>
+
+# ── Disable directory listing ─────────────────────────────────────
+Options -Indexes
+
+# ── PHP settings ─────────────────────────────────────────────────
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_value expose_php Off
+</IfModule>
