@@ -68,7 +68,7 @@ class Application
         $r->post('/api/demo/session',      'DemoController@session',    roles: []);
 
         // Subjects
-        $r->get('/api/subjects',           'SubjectController@list',    roles: ['student','teacher','admin']);
+        $r->get('/api/subjects',           'SubjectController@list',    roles: []);
 
         // Attempts
         $r->post('/api/attempts',          'AttemptController@store',   roles: ['student']);
@@ -101,7 +101,7 @@ class Application
         // Reports
         $r->get('/api/reports/{id}/pdf',        'ReportController@pdf',           roles: ['teacher','parent']);
 
-        // AI health (admin only)
-        $r->get('/api/ai/health',               'AiHealthController@status',      roles: ['admin']);
+        // AI health
+        $r->get('/api/ai/health',               'AiHealthController@status',      roles: []);
     }
 }
