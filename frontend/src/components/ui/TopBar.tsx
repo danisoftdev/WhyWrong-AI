@@ -32,14 +32,14 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           type="button"
           onClick={onNavigateHome}
-          className="flex items-center gap-2.5 text-left focus:outline-none"
+          className="flex items-center gap-2.5 text-left focus:outline-none group"
+          title="WhyWrong AI Home"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#734DFD] to-[#22D3EE] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-            W
-          </div>
-          <span className="font-display font-bold text-lg tracking-tight">
-            WhyWrong <span className="text-[#734DFD] font-mono text-xs">AI</span>
-          </span>
+          <img
+            src={isTeacher ? "/WWAI_compact_dark.png" : "/WWAI_compact.png"}
+            alt="WhyWrong AI"
+            className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105"
+          />
         </button>
 
         {/* Global Search */}

@@ -282,14 +282,21 @@ export const ParentPortal: React.FC = () => {
           </div>
 
           <div className="p-8 rounded-3xl bg-white border border-slate-200 space-y-6 printable-card">
-            <div className="flex items-center justify-between border-b pb-4">
-              <div>
-                <h2 className="text-xl font-bold font-display text-slate-900">
-                  Weekly Learning Progress Digest
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Student: <strong>{summaryData.student.display_name}</strong> ({summaryData.student.student_code})
-                </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-4 gap-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/WWAI.png"
+                  alt="WhyWrong AI"
+                  className="h-10 w-auto object-contain"
+                />
+                <div className="border-l border-slate-200 pl-3">
+                  <h2 className="text-lg font-bold font-display text-slate-900">
+                    Weekly Learning Progress Digest
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Student: <strong>{summaryData.student.display_name}</strong> ({summaryData.student.student_code})
+                  </p>
+                </div>
               </div>
               <div className="text-right text-xs text-slate-400">
                 <p>Week of {new Date().toLocaleDateString()}</p>

@@ -90,11 +90,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer Info in Sidebar */}
-      <div className={`p-3.5 rounded-2xl border text-xs ${
+      <div className={`p-3 rounded-2xl border text-xs flex items-center gap-3 ${
         isTeacher ? 'bg-[#111E38] border-[#1E2D4A]' : 'bg-white border-slate-200/60'
       }`}>
-        <p className="font-bold text-slate-700 dark:text-slate-200">WhyWrong Engine</p>
-        <p className="text-[11px] text-slate-400 mt-0.5">Free & Open Diagnosis Layer</p>
+        <img
+          src="/WWAI_icon.png"
+          alt="WhyWrong Engine"
+          className="w-8 h-8 object-contain rounded-lg flex-shrink-0"
+        />
+        <div>
+          <p className="font-bold text-slate-700 dark:text-slate-200 leading-tight">WhyWrong Engine</p>
+          <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">Diagnostic AI Layer</p>
+        </div>
       </div>
     </aside>
   );

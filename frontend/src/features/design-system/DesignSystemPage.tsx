@@ -25,9 +25,31 @@ export const DesignSystemPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Official Brand Identity */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-bold font-display text-slate-900">1. Official Brand Identity & Logo</h2>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 flex flex-col items-center justify-center text-center shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-4">Primary Brand (Light)</span>
+            <img src="/WWAI.png" alt="WhyWrong AI Light Logo" className="h-16 w-auto object-contain" />
+            <p className="text-xs font-mono text-slate-500 mt-4">/WWAI.png</p>
+          </div>
+          <div className="p-6 rounded-2xl bg-[#0B1020] border border-white/10 flex flex-col items-center justify-center text-center shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#22D3EE] mb-4">Midnight Brand (Dark)</span>
+            <img src="/WWAI_dark.png" alt="WhyWrong AI Dark Logo" className="h-16 w-auto object-contain" />
+            <p className="text-xs font-mono text-slate-400 mt-4">/WWAI_dark.png</p>
+          </div>
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 flex flex-col items-center justify-center text-center shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#734DFD] mb-4">Official Icon Mark</span>
+            <img src="/WWAI_icon.png" alt="WhyWrong AI Icon Mark" className="w-16 h-16 object-contain" />
+            <p className="text-xs font-mono text-slate-500 mt-4">/WWAI_icon.png</p>
+          </div>
+        </div>
+      </section>
+
       {/* Colors & Tokens */}
       <section className="space-y-4">
-        <h2 className="text-lg font-bold font-display text-slate-900">1. Color Palette Tokens</h2>
+        <h2 className="text-lg font-bold font-display text-slate-900">2. Color Palette Tokens</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 text-xs">
           <div className="p-4 rounded-2xl bg-[#0B1020] text-white">
             <p className="font-bold">Midnight</p>

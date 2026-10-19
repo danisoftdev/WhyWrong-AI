@@ -77,13 +77,15 @@ export const ReportPreviewPage: React.FC = () => {
         <div className="bg-white p-8 sm:p-12 rounded-3xl border border-slate-200/90 shadow-lg printable-card space-y-8">
           {/* Document Header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#734DFD] to-[#22D3EE] flex items-center justify-center text-white font-black text-xl shadow-sm">
-                W
-              </div>
-              <div>
+            <div className="flex items-center gap-4">
+              <img
+                src="/WWAI.png"
+                alt="WhyWrong AI Logo"
+                className="h-12 w-auto object-contain"
+              />
+              <div className="border-l border-slate-200 pl-4">
                 <h2 className="text-xl font-bold font-display text-slate-900">
-                  WhyWrong AI • Diagnostic & Remediation Report
+                  Diagnostic & Remediation Report
                 </h2>
                 <p className="text-xs text-slate-500 font-mono">
                   Document ID: {report.report_id} • Issued: {report.generated_at}

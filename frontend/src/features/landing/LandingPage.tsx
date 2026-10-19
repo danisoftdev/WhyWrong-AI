@@ -37,12 +37,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Navigation */}
       <nav className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between border-b border-white/10 relative z-20">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#734DFD] to-[#22D3EE] flex items-center justify-center text-white font-black text-base shadow-lg shadow-[#734DFD]/30">
-            W
-          </div>
-          <span className="font-display font-bold text-xl tracking-tight">
-            WhyWrong <span className="text-[#22D3EE] font-mono text-xs">AI</span>
-          </span>
+          <img
+            src="/WWAI_compact_dark.png"
+            alt="WhyWrong AI"
+            className="h-12 sm:h-14 w-auto object-contain"
+          />
         </div>
 
         <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-300">
@@ -223,6 +222,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-10 max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 relative z-20">
+        <div className="flex items-center gap-3">
+          <img src="/WWAI_dark.png" alt="WhyWrong AI" className="h-8 w-auto object-contain opacity-80" />
+        </div>
+        <p>© 2026 WhyWrong AI • Fix the thinking, not just the answer.</p>
+      </footer>
     </div>
   );
 };
