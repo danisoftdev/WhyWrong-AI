@@ -122,20 +122,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Right Column: Hero Visual & Floating Diagnostic Cards */}
         <div className="lg:col-span-5 relative flex items-center justify-center">
           {/* Glowing Ring */}
-          <div className="relative w-[340px] sm:w-[420px] h-[340px] sm:h-[420px] rounded-full border-2 border-[#22D3EE]/30 p-4 flex items-center justify-center shadow-[0_0_80px_-20px_rgba(34,211,238,0.35)]">
-            <div className="w-full h-full rounded-full border border-[#734DFD]/40 p-4 flex items-center justify-center">
-              {/* Illustrated Student Character / Mascot Centerpiece */}
-              <div className="w-48 h-48 rounded-full bg-gradient-to-tr from-[#734DFD]/30 to-[#22D3EE]/30 backdrop-blur-xl flex flex-col items-center justify-center border border-white/20 p-4 shadow-inner text-center">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-[#734DFD] to-[#22D3EE] flex items-center justify-center text-white mb-2 shadow-lg">
-                  <Brain className="w-10 h-10 text-white stroke-[2]" />
+          <div className="relative w-[360px] sm:w-[440px] h-[360px] sm:h-[440px] rounded-full border-2 border-[#22D3EE]/30 p-4 flex items-center justify-center shadow-[0_0_80px_-20px_rgba(34,211,238,0.35)]">
+            <div className="w-full h-full rounded-full border border-[#734DFD]/40 p-3 sm:p-4 flex items-center justify-center">
+              {/* Illustrated Cartoon Student with Backpack in Thinking & Learning Pose */}
+              <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full p-1.5 bg-gradient-to-tr from-[#734DFD] via-[#22D3EE] to-[#3B82F6] shadow-[0_0_60px_rgba(115,77,253,0.5)] group">
+                <div className="w-full h-full rounded-full overflow-hidden bg-[#0B1020] relative flex items-center justify-center border border-white/20 shadow-inner">
+                  <img
+                    src="/student_thinking_portrait.png"
+                    alt="Cartoon student with backpack learning and thinking"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  {/* Subtle gradient vignette at the bottom */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B1020]/90 via-transparent to-transparent pointer-events-none" />
+
+                  {/* Floating status label inside portal */}
+                  <div className="absolute bottom-3 inset-x-4 bg-[#0B1020]/85 backdrop-blur-md py-1.5 px-3 rounded-full border border-white/20 text-center shadow-xl">
+                    <span className="text-[11px] font-bold text-white font-display flex items-center justify-center gap-1.5 tracking-wide">
+                      <span className="w-2 h-2 rounded-full bg-[#0BAA7B] animate-pulse" />
+                      Active Thinking & Learning
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xs font-bold text-white font-display">Student Studio</span>
-                <span className="text-[10px] text-[#22D3EE]">Active Diagnostic Loop</span>
               </div>
             </div>
 
             {/* Floating Card 1: Question & Mistake */}
-            <div className="absolute -top-4 -left-6 bg-[#111E38]/95 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 shadow-2xl max-w-[200px] animate-bounce-slow">
+            <div className="absolute -top-3 -left-2 sm:-left-6 bg-[#111E38]/95 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 shadow-2xl max-w-[200px] animate-bounce-slow z-20">
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#E5484D] uppercase tracking-wider mb-1">
                 <X className="w-3.5 h-3.5 stroke-[3]" /> Why was this wrong?
               </div>
@@ -145,7 +157,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Floating Card 2: Misconception Detected */}
-            <div className="absolute -bottom-6 -left-4 bg-[#111E38]/95 backdrop-blur-md p-4 rounded-2xl border border-[#734DFD]/40 shadow-2xl max-w-[220px]">
+            <div className="absolute -bottom-5 -left-2 sm:-left-4 bg-[#111E38]/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-[#734DFD]/40 shadow-2xl max-w-[210px] sm:max-w-[230px] z-20">
               <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#22D3EE] mb-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#22D3EE]" /> Found Misconception
               </div>
@@ -154,7 +166,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Floating Card 3: Counterexample Lightbulb */}
-            <div className="absolute -top-2 -right-4 bg-[#111E38]/95 backdrop-blur-md p-3 rounded-2xl border border-amber-400/40 shadow-xl flex items-center gap-2.5">
+            <div className="absolute -top-2 right-0 sm:-right-3 bg-[#111E38]/95 backdrop-blur-md p-3 rounded-2xl border border-amber-400/40 shadow-xl flex items-center gap-2.5 z-20">
               <div className="p-2 rounded-xl bg-amber-400/20 text-amber-300">
                 <Lightbulb className="w-4 h-4" />
               </div>
@@ -165,7 +177,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Floating Card 4: Tagline Chart Card */}
-            <div className="absolute -bottom-2 -right-6 bg-gradient-to-br from-[#734DFD]/90 to-[#3B82F6]/90 backdrop-blur-md p-3.5 rounded-2xl border border-white/20 shadow-2xl text-left max-w-[190px]">
+            <div className="absolute -bottom-3 right-0 sm:-right-4 bg-gradient-to-br from-[#734DFD]/90 to-[#3B82F6]/90 backdrop-blur-md p-3.5 rounded-2xl border border-white/20 shadow-2xl text-left max-w-[190px] z-20">
               <div className="flex items-center gap-1 text-[10px] font-bold text-cyan-200 uppercase mb-1">
                 <TrendingUp className="w-3.5 h-3.5" /> Breakthrough
               </div>
