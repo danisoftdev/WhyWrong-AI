@@ -30,7 +30,7 @@ class LinkCodeController
         );
 
         if (!$membership) {
-            $response->error('Student does not belong to your classroom.', 'FORBIDDEN', 403);
+            $response->error('Student not found or unauthorized.', 'NOT_FOUND', 404);
             return;
         }
 

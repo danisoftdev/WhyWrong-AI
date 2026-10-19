@@ -51,6 +51,23 @@ export const api = {
     });
   },
 
+  async register(
+    role: 'parent' | 'teacher' | 'admin',
+    displayName: string,
+    email: string,
+    password: string
+  ): Promise<{ user: User; message: string }> {
+    return fetchApi('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        role,
+        display_name: displayName,
+        email,
+        password,
+      }),
+    });
+  },
+
   async logout(): Promise<void> {
     return fetchApi('/api/auth/logout', { method: 'POST' });
   },
@@ -62,23 +79,69 @@ export const api = {
     });
   },
 
+  // Roster & Student Account Creation
+  async createStudentRoster(
+    classId: string,
+    students: Array<{ display_name: string }>
+  ): Promise<{ students: any[]; message: string }> {
+    return fetchApi(`/api/classes/${classId}/roster`, {
+      method: 'POST',
+      body: JSON.stringify({ students }),
+    });
+  },
+
+  async resetStudentPin(studentId: string): Promise<{ temporary_pin: string; message: string }> {
+    return fetchApi(`/api/students/${studentId}/reset-pin`, {
+      method: 'POST',
+    });
+  },
+
+  // Admin Portal API
+  async getAdminUsers(): Promise<{ users: User[] }> {
+    return fetchApi('/api/admin/users');
+  },
+
+  async getAdminAuditLogs(): Promise<{ audit_logs: any[] }> {
+    return fetchApi('/api/admin/audit-logs');
+  },
+
+  async getAdminEvaluations(): Promise<{ results: any[]; message?: string }> {
+    return fetchApi('/api/admin/evaluations');
+  },
+
+  async executeDeletion(studentId: string): Promise<{ message: string; opaque_id: string }> {
+    return fetchApi(`/api/admin/deletion-requests/${studentId}/execute`, {
+      method: 'POST',
+    });
+  },
+
   // Subjects & Questions
   async getSubjects(): Promise<{ subjects: Subject[] }> {
     return fetchApi('/api/subjects');
   },
 
   // Learning Loop
-  async submitAttempt(questionId: string, selectedOptionId: string, workingText: string): Promise<{
+  async submitAttempt(
+    questionId: string,
+    selectedOptionId: string,
+    workingText: string,
+    confidence: 'sure' | 'unsure' | 'guessing' = 'sure'
+  ): Promise<{
     attempt_id: string;
     is_correct: boolean;
     requires_diagnosis: boolean;
   }> {
+    const idempotencyKey = 'ww-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
     return fetchApi('/api/attempts', {
       method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
       body: JSON.stringify({
         question_id: questionId,
         selected_option_id: selectedOptionId,
         working_text: workingText,
+        confidence,
       }),
     });
   },

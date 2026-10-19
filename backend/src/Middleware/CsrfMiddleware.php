@@ -18,7 +18,7 @@ class CsrfMiddleware
 
         // Exempt public auth & demo endpoints
         $path = $request->getPath();
-        if ($path === '/api/auth/login' || $path === '/api/demo/session') {
+        if ($path === '/api/auth/login' || $path === '/api/demo/session' || $path === '/api/auth/register') {
             return null;
         }
 

@@ -51,6 +51,7 @@ class AuthorisationTest extends TestCase
 
         $controller->summary($request, $response, ['id' => 'usr-student-02']);
 
-        $this->assertEquals(403, $response->getStatusCode());
+        // Section 6 Acceptance Test: A parent reading an unlinked child gets 404
+        $this->assertEquals(404, $response->getStatusCode());
     }
 }

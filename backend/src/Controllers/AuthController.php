@@ -35,7 +35,8 @@ class AuthController
             )['cnt'];
 
             if ($recentFailures >= 5) {
-                $response->error('Too many failed attempts. Account temporarily locked for 15 minutes for your security.', 'TOO_MANY_REQUESTS', 429);
+                // Rule: Five failed logins lock account with the exact same message as normal failure to prevent enumeration
+                $response->error('Invalid credentials or account temporarily locked.', 'UNAUTHORIZED', 401);
                 return;
             }
         } catch (\Throwable $e) {
@@ -50,17 +51,17 @@ class AuthController
 
         if (!$user) {
             $this->recordFailure($identHash);
-            $response->error('Invalid credentials.', 'UNAUTHORIZED', 401);
+            $response->error('Invalid credentials or account temporarily locked.', 'UNAUTHORIZED', 401);
             return;
         }
 
         // Check if account status is disabled or deleted
         if (isset($user['status']) && in_array($user['status'], ['disabled', 'deleted'], true)) {
-            $response->error('This account is no longer active. Please contact support.', 'FORBIDDEN', 403);
+            $response->error('Invalid credentials or account temporarily locked.', 'UNAUTHORIZED', 401);
             return;
         }
         if (isset($user['is_active']) && (int)$user['is_active'] === 0) {
-            $response->error('This account is no longer active. Please contact support.', 'FORBIDDEN', 403);
+            $response->error('Invalid credentials or account temporarily locked.', 'UNAUTHORIZED', 401);
             return;
         }
 
@@ -85,7 +86,7 @@ class AuthController
 
         if (!$isValid) {
             $this->recordFailure($identHash);
-            $response->error('Invalid credentials.', 'UNAUTHORIZED', 401);
+            $response->error('Invalid credentials or account temporarily locked.', 'UNAUTHORIZED', 401);
             return;
         }
 
@@ -142,22 +143,153 @@ class AuthController
     public function me(Request $request, Response $response): void
     {
         $user = $request->getUser();
-        if (!$user) {
-            $response->error('Not authenticated.', 'UNAUTHORIZED', 401);
-            return;
-        }
 
         $response->json([
             'status' => 'success',
-            'user' => [
+            'user' => $user ? [
                 'id'           => $user['id'],
                 'role'         => $user['role'],
                 'display_name' => $user['display_name'],
                 'student_code' => $user['student_code'] ?? null,
                 'email'        => $user['email'] ?? null,
                 'is_demo'      => (bool)($user['is_demo'] ?? false),
-            ],
+            ] : null,
             'csrf_token' => $_SESSION['csrf_token'] ?? '',
+        ]);
+    }
+
+    public function register(Request $request, Response $response): void
+    {
+        $role = (string)$request->get('role', 'parent');
+        $email = strtolower(trim((string)$request->get('email', '')));
+        $password = (string)$request->get('password', '');
+        $displayName = trim((string)$request->get('display_name', ''));
+
+        if (!in_array($role, ['parent', 'teacher', 'student', 'admin'], true)) {
+            $response->error('Role must be parent, teacher, student, or admin.', 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        if ($displayName === '') {
+            $response->error('Display name is required.', 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        $minPassLen = ($role === 'student') ? 4 : 8;
+        if (strlen($password) < $minPassLen) {
+            $response->error("Password must be at least {$minPassLen} characters.", 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        $studentCode = null;
+        if ($role === 'student') {
+            $lastStudent = $this->db->fetchOne("SELECT student_code FROM users WHERE role = 'student' AND student_code LIKE 'STU-%' ORDER BY student_code DESC LIMIT 1");
+            $nextNum = 1005;
+            if ($lastStudent && preg_match('/STU-(\d+)/', $lastStudent['student_code'], $m)) {
+                $nextNum = max($nextNum, ((int)$m[1]) + 1);
+            }
+            do {
+                $studentCode = 'STU-' . random_int(2000, 99999);
+            } while ($this->db->fetchOne("SELECT id FROM users WHERE student_code = ?", [$studentCode]));
+
+            if ($email === '') {
+                $email = strtolower($studentCode) . '@student.whywrong.ai';
+            }
+        }
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $response->error('Valid email address is required.', 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        // Check if user already exists
+        $existing = $this->db->fetchOne("SELECT id FROM users WHERE email = ?", [$email]);
+        if ($existing) {
+            $response->error('An account with this email already exists.', 'CONFLICT', 409);
+            return;
+        }
+
+        $userId = 'usr-' . bin2hex(random_bytes(8));
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+
+        // Fetch demo school if exists
+        $schoolId = null;
+        try {
+            $school = $this->db->fetchOne("SELECT id FROM schools LIMIT 1");
+            $schoolId = $school['id'] ?? null;
+        } catch (\Throwable $e) {}
+
+        $this->db->execute(
+            "INSERT INTO users (id, email, password_hash, display_name, role, student_code, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())",
+            [$userId, $email, $hash, $displayName, $role, $studentCode]
+        );
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+
+        $_SESSION['user_id'] = $userId;
+        $_SESSION['role'] = $role;
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
+
+        $response->json([
+            'status' => 'success',
+            'user' => [
+                'id'           => $userId,
+                'role'         => $role,
+                'display_name' => $displayName,
+                'email'        => $email,
+                'student_code' => $studentCode,
+                'is_demo'      => true,
+            ],
+            'csrf_token' => $_SESSION['csrf_token'],
+            'message' => 'Account successfully registered and signed in.',
+        ], 201);
+    }
+
+    public function resetStudentPin(Request $request, Response $response, array $params): void
+    {
+        $studentId = $params['id'] ?? '';
+        $currentUser = $request->getUser();
+
+        // Must be teacher or admin
+        if (!in_array($currentUser['role'] ?? '', ['teacher', 'admin'], true)) {
+            $response->error('Forbidden.', 'FORBIDDEN', 403);
+            return;
+        }
+
+        $student = $this->db->fetchOne("SELECT id, display_name, student_code FROM users WHERE id = ? AND role = 'student'", [$studentId]);
+        if (!$student) {
+            $response->error('Student not found.', 'NOT_FOUND', 404);
+            return;
+        }
+
+        // If teacher, verify student belongs to one of their classes
+        if ($currentUser['role'] === 'teacher') {
+            $belongs = $this->db->fetchOne(
+                "SELECT cm.id FROM class_members cm JOIN classes c ON cm.class_id = c.id WHERE cm.student_id = ? AND c.teacher_id = ?",
+                [$studentId, $currentUser['id']]
+            );
+            if (!$belongs) {
+                $response->error('Student not found.', 'NOT_FOUND', 404);
+                return;
+            }
+        }
+
+        // Generate temporary 4-digit PIN
+        $tempPin = (string)random_int(1000, 9999);
+        $newHash = password_hash($tempPin, PASSWORD_BCRYPT);
+
+        $this->db->execute("UPDATE users SET password_hash = ? WHERE id = ?", [$newHash, $studentId]);
+
+        $response->json([
+            'status' => 'success',
+            'student_id' => $studentId,
+            'student_code' => $student['student_code'],
+            'display_name' => $student['display_name'],
+            'temporary_pin' => $tempPin,
+            'message' => 'Temporary PIN issued. Provide this to the student securely.',
         ]);
     }
 

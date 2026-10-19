@@ -31,6 +31,11 @@ class Response
         return $this->content;
     }
 
+    public function getData(): array
+    {
+        return json_decode($this->content, true) ?: [];
+    }
+
     public function setHeader(string $name, string $value): self
     {
         $this->headers[$name] = $value;

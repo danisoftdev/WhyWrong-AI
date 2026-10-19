@@ -34,6 +34,8 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedOption, setSelectedOption] = useState<string>(config.question.defaultOptionId);
   const [workingText, setWorkingText] = useState<string>(config.question.defaultWorking);
+  const [confidence, setConfidence] = useState<'sure' | 'unsure' | 'guessing'>('sure');
+  const [isCorrectPath, setIsCorrectPath] = useState<boolean>(false);
   const [hasSubmitted, setHasSubmitted] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -58,11 +60,35 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   const [isPlayingStrip, setIsPlayingStrip] = useState<boolean>(false);
   const [retestScheduled, setRetestScheduled] = useState<boolean>(false);
 
+  // Draft preservation across session expiry / page reload
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem(`ww_quiz_draft_${subjectSlug}`);
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed.selectedOption) setSelectedOption(parsed.selectedOption);
+        if (parsed.workingText !== undefined) setWorkingText(parsed.workingText);
+        if (parsed.confidence) setConfidence(parsed.confidence);
+      }
+    } catch {}
+  }, [subjectSlug]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        `ww_quiz_draft_${subjectSlug}`,
+        JSON.stringify({ selectedOption, workingText, confidence })
+      );
+    } catch {}
+  }, [selectedOption, workingText, confidence, subjectSlug]);
+
   // Reset state when subject changes
   useEffect(() => {
     const active = SUBJECT_QUIZ_CONFIGS[subjectSlug] || SUBJECT_QUIZ_CONFIGS['mathematics'];
     setSelectedOption(active.question.defaultOptionId);
     setWorkingText(active.question.defaultWorking);
+    setConfidence('sure');
+    setIsCorrectPath(false);
     setDiagnosis({
       id: `diag-demo-${active.slug}-01`,
       attempt_id: `att-demo-${active.slug}-01`,
@@ -92,7 +118,13 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   const handleInitialSubmit = async () => {
     setLoading(true);
     try {
-      const res = await api.submitAttempt(`q-${config.slug}-01`, selectedOption, workingText);
+      const res = await api.submitAttempt(`q-${config.slug}-01`, selectedOption, workingText, confidence);
+      if (res.is_correct) {
+        setIsCorrectPath(true);
+        setHasSubmitted(true);
+        setCurrentStep(5);
+        return;
+      }
       const diagRes = await api.getDiagnosis(res.attempt_id);
       setDiagnosis(diagRes);
       setHasSubmitted(true);
@@ -108,9 +140,18 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   const handleProbeSubmit = async () => {
     setLoading(true);
     try {
-      await api.submitProbeResponse(`prb-${config.slug}-01`, selectedProbeOption, 'response');
-      setProbeResult('confirms');
-      setDiagnosis(prev => ({ ...prev, evidence_strength: 'strong' }));
+      const res = await api.submitProbeResponse(`prb-${config.slug}-01`, selectedProbeOption, 'response');
+      if (res.diagnosis_state === 'rejected' || (res as any).is_slip) {
+        setProbeResult('slip');
+        setDiagnosis(prev => ({
+          ...prev,
+          state: 'rejected',
+          evidence_strength: 'low',
+        }));
+      } else {
+        setProbeResult('confirms');
+        setDiagnosis(prev => ({ ...prev, evidence_strength: 'strong' }));
+      }
       setCurrentStep(4);
     } catch {
       setCurrentStep(4);
@@ -246,6 +287,48 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                 />
               </div>
 
+              {/* Self-Confidence Input (Sure, Unsure, Guessing) */}
+              <div className="space-y-2 pt-2">
+                <label className="text-xs font-bold text-slate-700 block">
+                  How confident do you feel about this answer?
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfidence('sure')}
+                    className={`min-h-[44px] px-3 py-2 text-xs font-semibold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      confidence === 'sure'
+                        ? 'border-[#734DFD] bg-[#734DFD]/10 text-[#734DFD] ring-2 ring-[#734DFD]/30 font-bold'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>🌟</span> <span>I'm Sure</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfidence('unsure')}
+                    className={`min-h-[44px] px-3 py-2 text-xs font-semibold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      confidence === 'unsure'
+                        ? 'border-[#734DFD] bg-[#734DFD]/10 text-[#734DFD] ring-2 ring-[#734DFD]/30 font-bold'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>🤔</span> <span>Thinking / Unsure</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfidence('guessing')}
+                    className={`min-h-[44px] px-3 py-2 text-xs font-semibold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      confidence === 'guessing'
+                        ? 'border-[#734DFD] bg-[#734DFD]/10 text-[#734DFD] ring-2 ring-[#734DFD]/30 font-bold'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>🎲</span> <span>Just Guessing</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Robot Mascot Bubble */}
               <Mascot
                 mood="thinking"
@@ -253,7 +336,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               />
 
               <div className="flex justify-end pt-2">
-                <Button variant="gradient" size="lg" onClick={handleInitialSubmit}>
+                <Button variant="gradient" size="lg" className="min-h-[44px]" onClick={handleInitialSubmit}>
                   Submit Answer & Analyze <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -393,6 +476,13 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                     onClick={() => setSelectedProbeOption(opt.id)}
                   />
                 ))}
+                <OptionButton
+                  key="opt-probe-unsure"
+                  label="?"
+                  text="I'm not sure / need help"
+                  isSelected={selectedProbeOption === 'opt-probe-unsure'}
+                  onClick={() => setSelectedProbeOption('opt-probe-unsure')}
+                />
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-500 flex items-center gap-2">
@@ -401,10 +491,10 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               </div>
 
               <div className="flex justify-between items-center pt-2">
-                <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                <Button variant="outline" className="min-h-[44px]" onClick={() => setCurrentStep(2)}>
                   Back to Diagnosis
                 </Button>
-                <Button variant="gradient" size="lg" onClick={handleProbeSubmit}>
+                <Button variant="gradient" size="lg" className="min-h-[44px]" onClick={handleProbeSubmit}>
                   Submit Probe & See Remediation <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -416,23 +506,41 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
           {/* ───────────────────────────────────────────────────────── */}
           {currentStep === 4 && (
             <div className="space-y-6">
-              {/* Evidence Lift Banner */}
-              <div className="p-5 rounded-2xl bg-[#0BAA7B]/10 border border-[#0BAA7B]/30 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#0BAA7B]/20 text-[#0BAA7B] flex items-center justify-center font-bold">
-                    ✓
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-[#0BAA7B] font-display">
-                      Misconception Confirmed with Strong Evidence
-                    </h4>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      Your probe responses matched the predicted pattern. Now let's fix the rule!
-                    </p>
+              {/* Slip or Evidence Lift Banner */}
+              {diagnosis.state === 'rejected' || probeResult === 'slip' ? (
+                <div className="p-5 rounded-2xl bg-[#0BAA7B]/10 border border-[#0BAA7B]/30 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#0BAA7B]/20 text-[#0BAA7B] flex items-center justify-center font-bold text-lg">
+                      🎉
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#0BAA7B] font-display">
+                        Great Job! That was just a momentary slip.
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Your probe answers proved you understand the core idea. No misconception detected!
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <StrengthMeter strength={diagnosis.evidence_strength} />
-              </div>
+              ) : (
+                <div className="p-5 rounded-2xl bg-[#0BAA7B]/10 border border-[#0BAA7B]/30 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#0BAA7B]/20 text-[#0BAA7B] flex items-center justify-center font-bold">
+                      ✓
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#0BAA7B] font-display">
+                        Misconception Confirmed with Strong Evidence
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Your probe responses matched the predicted pattern. Now let's fix the rule!
+                      </p>
+                    </div>
+                  </div>
+                  <StrengthMeter strength={diagnosis.evidence_strength} />
+                </div>
+              )}
 
               {/* Tabbed Remediation Card */}
               <Card variant="student" className="p-6 space-y-6">

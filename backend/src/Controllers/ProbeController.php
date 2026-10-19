@@ -84,7 +84,28 @@ class ProbeController
             [$diagId]
         );
 
-        $response->json(['status' => 'success', 'probes' => $probesCreated]);
+        // Sanitize for student: question payloads NEVER contain is_correct, predicted_wrong, or rationale
+        $clientProbes = [];
+        foreach ($probesCreated as $p) {
+            $cleanOptions = [];
+            foreach ($p['question']['options'] as $opt) {
+                $cleanOptions[] = [
+                    'id'   => is_array($opt) ? ($opt['id'] ?? '') : '',
+                    'text' => is_array($opt) ? ($opt['text'] ?? (string)$opt) : (string)$opt,
+                ];
+            }
+            $clientProbes[] = [
+                'id'           => $p['id'],
+                'diagnosis_id' => $diagId,
+                'question'     => [
+                    'prompt'  => $p['question']['prompt'],
+                    'options' => $cleanOptions,
+                ],
+                'result'       => 'pending',
+            ];
+        }
+
+        $response->json(['status' => 'success', 'probes' => $clientProbes]);
     }
 
     public function respond(Request $request, Response $response, array $params): void
@@ -129,17 +150,10 @@ class ProbeController
         }
 
         $result = 'inconclusive';
-        $newStrength = 'moderate';
-        $diagState = 'probing';
-
         if ($isPredictedWrong) {
             $result = 'confirms';
-            $newStrength = 'strong';
-            $diagState = 'suspected'; // Reinforced suspected hypothesis
         } elseif ($isCorrect) {
             $result = 'contradicts';
-            $newStrength = 'low';
-            $diagState = 'rejected'; // Hypothesis rejected by contradictory evidence
         }
 
         $this->db->execute(
@@ -147,17 +161,49 @@ class ProbeController
             [json_encode(['selected_option_id' => $selectedOptionId, 'selected_text' => $selectedText]), $result, $probeId]
         );
 
+        // Fetch all probes for this diagnosis to compute cumulative evidence
+        $allProbes = $this->db->fetchAll(
+            "SELECT result FROM probes WHERE diagnosis_id = ?",
+            [$probe['diag_id']]
+        );
+
+        $hasPredictedWrong = false;
+        $allCorrect = true;
+        $answeredCount = 0;
+
+        foreach ($allProbes as $ap) {
+            if ($ap['result'] === 'confirms') {
+                $hasPredictedWrong = true;
+                $allCorrect = false;
+            } elseif ($ap['result'] !== 'contradicts') {
+                $allCorrect = false;
+            }
+            if ($ap['result'] !== 'pending') {
+                $answeredCount++;
+            }
+        }
+
+        // Rule: Two predicted probes give Strong
+        // Rule: One wrong answer with all probes correct gives slip and rejected. A rejected diagnosis (slip) shows no label to student.
+        $isSlip = ($answeredCount >= count($allProbes)) && $allCorrect;
+        if ($isSlip) {
+            $diagState = 'rejected';
+            $newStrength = 'low';
+            $eventMsg = "All probes answered correctly. Initial error diagnosed as a momentary slip. Hypothesis rejected.";
+        } elseif ($hasPredictedWrong) {
+            $diagState = 'suspected';
+            $newStrength = 'strong';
+            $eventMsg = "Probe confirmed predicted misconception pattern. Evidence strength raised to strong.";
+        } else {
+            $diagState = 'probing';
+            $newStrength = 'moderate';
+            $eventMsg = "Probe recorded as inconclusive.";
+        }
+
         $this->db->execute(
             "UPDATE diagnoses SET evidence_strength = ?, state = ? WHERE id = ?",
             [$newStrength, $diagState, $probe['diag_id']]
         );
-
-        // Log agent event
-        $eventMsg = $result === 'confirms'
-            ? "Probe confirmed predicted misconception pattern. Evidence strength raised to strong."
-            : ($result === 'contradicts'
-                ? "Probe contradicted predicted pattern. Hypothesis lowered to low evidence."
-                : "Probe response recorded as inconclusive.");
 
         $this->db->execute(
             "INSERT INTO agent_events (id, diagnosis_id, stage, action, sanitized_payload, status) VALUES (UUID(), ?, 'probe', ?, '{}', 'done')",
@@ -170,6 +216,8 @@ class ProbeController
             'result'            => $result,
             'evidence_strength' => $newStrength,
             'diagnosis_state'   => $diagState,
+            'is_slip'           => $isSlip,
+            'feedback'          => $isSlip ? "Great job! That was just a momentary slip. You've got this!" : $eventMsg,
             'message'           => $eventMsg,
         ]);
     }

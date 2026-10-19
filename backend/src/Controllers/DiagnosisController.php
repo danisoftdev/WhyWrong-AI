@@ -83,10 +83,14 @@ class DiagnosisController
         // Hard rule: single wrong answer is only suspected
         $state = 'suspected';
         $diagId = 'diag-' . bin2hex(random_bytes(8));
-        $miscId = $diagnosis['misconception_id'] ?? null;
-        $strength = in_array($diagnosis['evidence_strength'] ?? '', ['low', 'moderate', 'strong'], true)
-            ? $diagnosis['evidence_strength']
-            : 'moderate';
+        // Factor in self-confidence: "sure" -> moderate, "guessing" -> low
+        $confidence = $answerData['confidence'] ?? 'sure';
+        $strength = match ($confidence) {
+            'guessing', 'unsure' => 'low',
+            default => in_array($diagnosis['evidence_strength'] ?? '', ['low', 'moderate', 'strong'], true)
+                ? $diagnosis['evidence_strength']
+                : 'moderate',
+        };
         $providerName = $diagnosis['provider'] ?? 'rules_engine';
         $isDemo = !empty($diagnosis['is_demo']) ? 1 : 0;
 
@@ -139,13 +143,13 @@ class DiagnosisController
         );
 
         if (!$diag) {
-            $response->error('Diagnosis not found.', 'NOT_FOUND', 404);
+            $response->error('Diagnosis not found or unauthorized.', 'NOT_FOUND', 404);
             return;
         }
 
-        // Authorisation: student can view own, teacher can view classroom, parent can view linked
+        // Authorisation: Student A requesting Student B's diagnosis gets 404
         if ($user['role'] === 'student' && $diag['student_id'] !== $user['id']) {
-            $response->error('Forbidden.', 'FORBIDDEN', 403);
+            $response->error('Diagnosis not found or unauthorized.', 'NOT_FOUND', 404);
             return;
         }
 
@@ -155,9 +159,17 @@ class DiagnosisController
                 [$user['id'], $diag['student_id']]
             );
             if (!$isLinked) {
-                $response->error('Forbidden: student not linked to this parent.', 'FORBIDDEN', 403);
+                $response->error('Diagnosis not found or unauthorized.', 'NOT_FOUND', 404);
                 return;
             }
+        }
+
+        // Rule: A rejected diagnosis (slip) shows no label to the student. The student sees encouraging feedback only.
+        if ($user['role'] === 'student' && $diag['state'] === 'rejected') {
+            $diag['misconception_id'] = null;
+            $diag['misconception_label'] = null;
+            $diag['misconception_explanation'] = null;
+            $diag['feedback'] = "Great job! That was just a momentary slip. You answered the check questions correctly.";
         }
 
         $diag['answer'] = json_decode($diag['answer_json'], true);

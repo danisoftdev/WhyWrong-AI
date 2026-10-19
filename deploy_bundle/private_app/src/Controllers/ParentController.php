@@ -66,6 +66,15 @@ class ParentController
             [$parentId, $studentId]
         );
 
+        // Record consent
+        try {
+            $this->db->execute(
+                "INSERT INTO consents (id, user_id, subject_student_id, consent_type, version, granted_at)
+                 VALUES (UUID(), ?, ?, 'parent_access', '1.0', NOW())",
+                [$parentId, $studentId]
+            );
+        } catch (\Throwable $e) {}
+
         $student = $this->db->fetchOne("SELECT id, display_name, student_code FROM users WHERE id = ?", [$studentId]);
 
         $response->json([
@@ -90,19 +99,55 @@ class ParentController
         $response->json(['status' => 'success', 'children' => $children]);
     }
 
-    public function summary(Request $request, Response $response, array $params): void
+    public function revoke(Request $request, Response $response, array $params): void
     {
         $parentId = $request->getUserId();
         $studentId = $params['id'] ?? '';
 
-        // Authorisation: verify parent is linked to this student
+        // Authorisation: verify parent is active linked
         $link = $this->db->fetchOne(
             "SELECT id FROM parent_students WHERE parent_id = ? AND student_id = ? AND status = 'active'",
             [$parentId, $studentId]
         );
 
         if (!$link) {
-            $response->error('Forbidden: you are not linked to this student.', 'FORBIDDEN', 403);
+            $response->error('Student link not found.', 'NOT_FOUND', 404);
+            return;
+        }
+
+        // F-14: Revoking a parent link marks consent withdrawn and stops digests
+        $this->db->execute(
+            "UPDATE parent_students SET status = 'revoked' WHERE parent_id = ? AND student_id = ?",
+            [$parentId, $studentId]
+        );
+
+        try {
+            $this->db->execute(
+                "INSERT INTO consents (id, user_id, subject_student_id, consent_type, version, granted_at)
+                 VALUES (UUID(), ?, ?, 'parent_access_withdrawn', '1.0', NOW())",
+                [$parentId, $studentId]
+            );
+        } catch (\Throwable $e) {}
+
+        $response->json([
+            'status'  => 'success',
+            'message' => 'Parent link revoked and consent withdrawn. Weekly digests have been stopped.',
+        ]);
+    }
+
+    public function summary(Request $request, Response $response, array $params): void
+    {
+        $parentId = $request->getUserId();
+        $studentId = $params['id'] ?? '';
+
+        // Authorisation: verify parent is linked to this student (Rule: unlinked gets 404)
+        $link = $this->db->fetchOne(
+            "SELECT id FROM parent_students WHERE parent_id = ? AND student_id = ? AND status = 'active'",
+            [$parentId, $studentId]
+        );
+
+        if (!$link) {
+            $response->error('Student not found or unauthorized.', 'NOT_FOUND', 404);
             return;
         }
 
@@ -111,13 +156,13 @@ class ParentController
             [$studentId]
         );
 
-        // Plain language summary: only show teacher-accepted or confirmed diagnoses
+        // Rule: Only teacher-accepted (confirmed) diagnoses. Never raw answers, never unreviewed or rejected.
         $acceptedDiagnoses = $this->db->fetchAll(
             "SELECT d.id, m.label as misconception_label, m.explanation, d.created_at
              FROM diagnoses d
              JOIN attempts a ON d.attempt_id = a.id
              JOIN misconceptions m ON d.misconception_id = m.id
-             WHERE a.student_id = ? AND d.state IN ('confirmed', 'suspected')
+             WHERE a.student_id = ? AND d.state = 'confirmed'
              ORDER BY d.created_at DESC",
             [$studentId]
         );

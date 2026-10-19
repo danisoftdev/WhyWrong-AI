@@ -31,8 +31,8 @@ class SubjectController
                 $questions = $this->db->fetchAll("SELECT * FROM questions WHERE topic_id = ?", [$t['id']]);
                 foreach ($questions as &$q) {
                     $q['options'] = json_decode($q['options_json'], true) ?: [];
-                    // Sanitize for students: never leak correct_answer or distractor_map before submission
-                    if ($request->getUserRole() === 'student') {
+                    // Sanitize for students and visitors: never leak correct_answer, distractor_map, or misconception ids
+                    if (!in_array($request->getUserRole(), ['teacher', 'admin'], true)) {
                         unset($q['correct_answer'], $q['distractor_map']);
                         foreach ($q['options'] as &$opt) {
                             unset($opt['is_correct'], $opt['misconception_id']);

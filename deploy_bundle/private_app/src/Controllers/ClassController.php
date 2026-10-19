@@ -86,8 +86,17 @@ class ClassController
         );
 
         foreach ($misconceptionsRanked as &$mr) {
-            $pct = $totalStudents > 0 ? (int)round(($mr['student_count'] / $totalStudents) * 100) : 0;
-            $mr['percentage'] = $pct;
+            $count = (int)$mr['student_count'];
+            if ($count < 3) {
+                // Rule: fewer than 3 students with a misconception: suppress percentages to protect privacy
+                $mr['percentage'] = null;
+                $mr['suppressed'] = true;
+                $mr['suppressed_note'] = 'Suppressed (< 3 students to protect privacy)';
+            } else {
+                $pct = $totalStudents > 0 ? (int)round(($count / $totalStudents) * 100) : 0;
+                $mr['percentage'] = $pct;
+                $mr['suppressed'] = false;
+            }
         }
 
         // Student diagnoses drill-down
@@ -162,6 +171,85 @@ class ClassController
             'common_misconceptions'  => $misconceptionsRanked,
             'heatmap_grid'           => $heatmapGrid,
             'students'               => $studentDrilldown,
+            'last_updated_at'        => date('Y-m-d H:i:s'),
+            'freshness_interval_sec' => 600,
         ]);
+    }
+
+    public function roster(Request $request, Response $response, array $params): void
+    {
+        $classId = $params['id'] ?? (string)$request->get('class_id', '');
+        $teacherId = $request->getUserId();
+
+        $class = $this->db->fetchOne("SELECT * FROM classes WHERE id = ? AND teacher_id = ?", [$classId, $teacherId]);
+        if (!$class) {
+            $response->error('Class not found or unauthorized.', 'NOT_FOUND', 404);
+            return;
+        }
+
+        $studentsInput = $request->get('students');
+        $csvData = (string)$request->get('csv', '');
+
+        $names = [];
+        if (is_array($studentsInput)) {
+            foreach ($studentsInput as $item) {
+                $n = is_array($item) ? trim((string)($item['display_name'] ?? $item['name'] ?? '')) : trim((string)$item);
+                if ($n !== '') $names[] = $n;
+            }
+        } elseif ($csvData !== '') {
+            $lines = explode("\n", $csvData);
+            foreach ($lines as $line) {
+                $clean = trim($line, " \r\n\t,");
+                if ($clean !== '' && !str_starts_with(strtolower($clean), 'name') && !str_starts_with(strtolower($clean), 'student')) {
+                    $parts = str_getcsv($clean);
+                    if (!empty($parts[0])) $names[] = trim($parts[0]);
+                }
+            }
+        }
+
+        if (empty($names)) {
+            $response->error('At least one student name is required.', 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        $created = [];
+        $lastStudent = $this->db->fetchOne("SELECT student_code FROM users WHERE role = 'student' AND student_code LIKE 'STU-%' ORDER BY student_code DESC LIMIT 1");
+        $nextNum = 1005;
+        if ($lastStudent && preg_match('/STU-(\d+)/', $lastStudent['student_code'], $m)) {
+            $nextNum = max($nextNum, ((int)$m[1]) + 1);
+        }
+
+        foreach ($names as $name) {
+            $studentId = 'usr-' . bin2hex(random_bytes(8));
+            $code = 'STU-' . $nextNum++;
+            $pin = (string)random_int(1000, 9999);
+            $hash = password_hash($pin, PASSWORD_BCRYPT);
+
+            $this->db->execute(
+                "INSERT INTO users (id, display_name, student_code, password_hash, role, is_demo, created_at)
+                 VALUES (?, ?, ?, ?, 'student', 1, NOW())",
+                [$studentId, $name, $code, $hash]
+            );
+
+            $this->db->execute(
+                "INSERT INTO class_members (id, class_id, student_id, joined_at)
+                 VALUES (UUID(), ?, ?, NOW())",
+                [$classId, $studentId]
+            );
+
+            $created[] = [
+                'id'           => $studentId,
+                'display_name' => $name,
+                'student_code' => $code,
+                'pin'          => $pin,
+            ];
+        }
+
+        $response->json([
+            'status'   => 'success',
+            'message'  => count($created) . " students added to {$class['name']}.",
+            'class_id' => $classId,
+            'students' => $created,
+        ], 201);
     }
 }

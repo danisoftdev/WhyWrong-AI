@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Role, User, Subject } from './types';
 import { api } from './services/api';
 import { DemoBar } from './components/ui/DemoBar';
+import { Footer } from './components/ui/Footer';
 import { TopBar } from './components/ui/TopBar';
 import { Sidebar } from './components/ui/Sidebar';
 import { LoginModal } from './components/ui/LoginModal';
@@ -127,11 +128,13 @@ export function App() {
   if (!currentUser || currentUser.role === 'visitor') {
     return (
       <div className="min-h-screen bg-[#0B1020]">
-        <DemoBar
-          currentUser={currentUser}
-          onSwitchRole={handleSwitchRole}
-          onOpenDesignSystem={() => setShowDesignSystem(true)}
-        />
+        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+          <DemoBar
+            currentUser={currentUser}
+            onSwitchRole={handleSwitchRole}
+            onOpenDesignSystem={() => setShowDesignSystem(true)}
+          />
+        )}
         <LandingPage
           onStartLearning={() => handleSwitchRole('student')}
           onExploreTeacher={() => handleSwitchRole('teacher')}
@@ -143,6 +146,8 @@ export function App() {
           onClose={() => setIsLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
+      <Footer />
+<Footer />
       </div>
     );
   }
@@ -151,11 +156,13 @@ export function App() {
   if (currentUser.role === 'teacher') {
     return (
       <div className="min-h-screen bg-[#0C1421] text-white">
-        <DemoBar
-          currentUser={currentUser}
-          onSwitchRole={handleSwitchRole}
-          onOpenDesignSystem={() => setShowDesignSystem(true)}
-        />
+        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+          <DemoBar
+            currentUser={currentUser}
+            onSwitchRole={handleSwitchRole}
+            onOpenDesignSystem={() => setShowDesignSystem(true)}
+          />
+        )}
         <TopBar
           user={currentUser}
           variant="teacher"
@@ -179,6 +186,7 @@ export function App() {
           onClose={() => setIsLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
+      <Footer />
       </div>
     );
   }
@@ -187,11 +195,13 @@ export function App() {
   if (currentUser.role === 'parent') {
     return (
       <div className="min-h-screen bg-[#F7F9FC] text-slate-800">
-        <DemoBar
-          currentUser={currentUser}
-          onSwitchRole={handleSwitchRole}
-          onOpenDesignSystem={() => setShowDesignSystem(true)}
-        />
+        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+          <DemoBar
+            currentUser={currentUser}
+            onSwitchRole={handleSwitchRole}
+            onOpenDesignSystem={() => setShowDesignSystem(true)}
+          />
+        )}
         <TopBar
           user={currentUser}
           variant="student"
@@ -215,6 +225,7 @@ export function App() {
           onClose={() => setIsLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
+      <Footer />
       </div>
     );
   }
@@ -223,11 +234,13 @@ export function App() {
   if (currentUser.role === 'admin') {
     return (
       <div className="min-h-screen bg-[#0C1421] text-white">
-        <DemoBar
-          currentUser={currentUser}
-          onSwitchRole={handleSwitchRole}
-          onOpenDesignSystem={() => setShowDesignSystem(true)}
-        />
+        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+          <DemoBar
+            currentUser={currentUser}
+            onSwitchRole={handleSwitchRole}
+            onOpenDesignSystem={() => setShowDesignSystem(true)}
+          />
+        )}
         <TopBar
           user={currentUser}
           variant="teacher"
@@ -304,18 +317,21 @@ export function App() {
           onClose={() => setIsLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
-      </div>
+      <Footer />
+</div>
     );
   }
 
   // 5. STUDENT STUDIO (Default Light Studio #F7F9FC)
   return (
     <div className="min-h-screen bg-[#F7F9FC] text-slate-800 flex flex-col">
-      <DemoBar
-        currentUser={currentUser}
-        onSwitchRole={handleSwitchRole}
-        onOpenDesignSystem={() => setShowDesignSystem(true)}
-      />
+{process.env.REACT_APP_DEMO_MODE === 'true' && (
+        <DemoBar
+          currentUser={currentUser}
+          onSwitchRole={handleSwitchRole}
+          onOpenDesignSystem={() => setShowDesignSystem(true)}
+        />
+      )}
       <TopBar
         user={currentUser}
         variant="student"
