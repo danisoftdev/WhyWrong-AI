@@ -61,7 +61,7 @@ class AiHealthController
                 ],
             ],
             'policy' => [
-                'anthropic_status' => 'BANNED - No Claude or Anthropic APIs permitted',
+                'non_free_apis'    => 'BANNED - Zero paid third-party dependencies',
                 'privacy'          => 'Student names/PII anonymised before LLM calls',
                 'authorisation'    => 'Strict object-level RBAC enforced',
             ],

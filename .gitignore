@@ -72,6 +72,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+backend/config/local.php
+!backend/config/local.example.php
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

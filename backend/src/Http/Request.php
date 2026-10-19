@@ -56,6 +56,7 @@ class Request
     public function getBody(): array { return $this->body; }
     public function get(string $key, mixed $default = null): mixed { return $this->body[$key] ?? $this->queryParams[$key] ?? $default; }
     public function getHeader(string $name, ?string $default = null): ?string { return $this->headers[strtolower($name)] ?? $default; }
+    public function header(string $name, ?string $default = null): ?string { return $this->getHeader($name, $default); }
 
     public function setUser(?array $user): void { $this->user = $user; }
     public function getUser(): ?array { return $this->user; }

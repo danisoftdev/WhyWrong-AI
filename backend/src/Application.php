@@ -56,6 +56,9 @@ class Application
     {
         $r = $this->router;
 
+        // Health
+        $r->get('/api/health',             'HealthController@status',   roles: []);
+
         // Auth
         $r->post('/api/auth/login',        'AuthController@login',      roles: []);
         $r->post('/api/auth/logout',       'AuthController@logout',     roles: ['student','teacher','parent','admin']);

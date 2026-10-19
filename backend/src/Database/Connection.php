@@ -17,11 +17,17 @@ class Connection
 
     private function __construct()
     {
-        $host    = $_ENV['DB_HOST']    ?? 'localhost';
-        $port    = $_ENV['DB_PORT']    ?? '3306';
-        $dbname  = $_ENV['DB_NAME']    ?? 'whywrong';
-        $user    = $_ENV['DB_USER']    ?? '';
-        $pass    = $_ENV['DB_PASS']    ?? '';
+        $config = [];
+        $configFile = __DIR__ . '/../../config/local.php';
+        if (file_exists($configFile)) {
+            $config = require $configFile;
+        }
+
+        $host    = $_ENV['DB_HOST']    ?? $config['db']['host'] ?? 'localhost';
+        $port    = $_ENV['DB_PORT']    ?? $config['db']['port'] ?? '3306';
+        $dbname  = $_ENV['DB_NAME']    ?? $config['db']['name'] ?? 'whywrong';
+        $user    = $_ENV['DB_USER']    ?? $config['db']['user'] ?? '';
+        $pass    = $_ENV['DB_PASS']    ?? $config['db']['pass'] ?? '';
 
         $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 
