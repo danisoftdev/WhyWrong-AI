@@ -104,7 +104,9 @@ class ClassController
         foreach ($students as $stu) {
             $diags = $this->db->fetchAll(
                 "SELECT d.id, d.state, d.evidence_quote, d.evidence_strength, d.created_at,
-                        m.label as misconception_label, q.prompt
+                        d.misconception_id, m.label as misconception_label, q.prompt,
+                        (SELECT tr.decision FROM teacher_reviews tr
+                          WHERE tr.diagnosis_id = d.id ORDER BY tr.created_at DESC LIMIT 1) AS review_decision
                  FROM diagnoses d
                  JOIN attempts a ON d.attempt_id = a.id
                  JOIN questions q ON a.question_id = q.id
@@ -123,45 +125,52 @@ class ClassController
             ];
         }
 
-        // Concept Mastery Heatmap Grid
-        $heatmapGrid = [
-            [
-                'topic' => 'Fractions: Addition',
-                'strong' => 14,
-                'okay' => 6,
-                'weak' => 4,
-                'status' => 'Okay',
-            ],
-            [
-                'topic' => 'Fractions: Comparison',
-                'strong' => 18,
-                'okay' => 4,
-                'weak' => 2,
-                'status' => 'Strong',
-            ],
-            [
-                'topic' => 'Forces: Constant Motion',
-                'strong' => 8,
-                'okay' => 10,
-                'weak' => 6,
-                'status' => 'Weak',
-            ],
-            [
-                'topic' => 'Computing: Loop Bounds',
-                'strong' => 16,
-                'okay' => 5,
-                'weak' => 3,
-                'status' => 'Strong',
-            ],
-        ];
+        $heatmapGrid = $this->db->fetchAll(
+            "SELECT COALESCE(t.name, 'Question without a topic') AS topic,
+                    COUNT(DISTINCT CASE WHEN d.state = 'confirmed' THEN a.student_id END) AS accepted,
+                    COUNT(DISTINCT CASE WHEN d.state IN ('suspected', 'probing') THEN a.student_id END) AS open_cases
+             FROM diagnoses d
+             JOIN attempts a ON d.attempt_id = a.id
+             JOIN class_members cm ON a.student_id = cm.student_id AND cm.class_id = ?
+             LEFT JOIN misconceptions m ON d.misconception_id = m.id
+             LEFT JOIN topics t ON m.topic_id = t.id
+             WHERE d.state <> 'rejected'
+             GROUP BY COALESCE(t.name, 'Question without a topic')
+             ORDER BY open_cases DESC, topic ASC",
+            [$classId]
+        );
 
+        $openCases = 0;
+        $acceptedIdeas = 0;
+        foreach ($studentDrilldown as $stu) {
+            foreach ($stu['diagnoses'] as $diag) {
+                if (in_array($diag['state'], ['suspected', 'probing'], true)) {
+                    $openCases++;
+                } elseif ($diag['state'] === 'confirmed') {
+                    $acceptedIdeas++;
+                }
+            }
+        }
+
+        $packIdeas = $this->db->fetchAll(
+            "SELECT DISTINCT m.id, m.label
+             FROM misconceptions m
+             JOIN diagnoses d ON d.misconception_id = m.id
+             JOIN attempts a ON d.attempt_id = a.id
+             JOIN class_members cm ON a.student_id = cm.student_id
+             WHERE cm.class_id = ?
+             ORDER BY m.label ASC",
+            [$classId]
+        );
+
+        $seeded = ($class['id'] ?? '') === 'cls-math-form2';
         $kpis = [
-            'total_students'             => $totalStudents,
-            'active_misconceptions'      => count($misconceptionsRanked),
-            'concept_mastery_pct'        => 74,
-            'recommended_interventions'  => 2,
-            'is_demo_data'               => true,
-            'demo_label'                 => 'Demonstration data for class 2A',
+            'total_students'        => $totalStudents,
+            'active_misconceptions' => count($misconceptionsRanked),
+            'open_cases'            => $openCases,
+            'accepted_ideas'        => $acceptedIdeas,
+            'is_demo_data'          => $seeded,
+            'demo_label'            => $seeded ? 'Seeded demonstration class' : '',
         ];
 
         $response->json([
@@ -170,6 +179,7 @@ class ClassController
             'kpis'                   => $kpis,
             'common_misconceptions'  => $misconceptionsRanked,
             'heatmap_grid'           => $heatmapGrid,
+            'pack_ideas'             => $packIdeas,
             'students'               => $studentDrilldown,
             'last_updated_at'        => date('Y-m-d H:i:s'),
             'freshness_interval_sec' => 600,
@@ -225,10 +235,11 @@ class ClassController
             $pin = (string)random_int(1000, 9999);
             $hash = password_hash($pin, PASSWORD_BCRYPT);
 
+            $email = strtolower($code) . '@student.whywrong.ai';
             $this->db->execute(
-                "INSERT INTO users (id, display_name, student_code, password_hash, role, is_demo, created_at)
-                 VALUES (?, ?, ?, ?, 'student', 1, NOW())",
-                [$studentId, $name, $code, $hash]
+                "INSERT INTO users (id, display_name, student_code, email, password_hash, role, created_at)
+                 VALUES (?, ?, ?, ?, ?, 'student', NOW())",
+                [$studentId, $name, $code, $email, $hash]
             );
 
             $this->db->execute(

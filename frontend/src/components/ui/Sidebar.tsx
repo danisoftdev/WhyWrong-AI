@@ -8,10 +8,8 @@ import {
   FileText,
   LayoutGrid,
   Users,
-  AlertTriangle,
   ClipboardList,
-  FolderKanban,
-  Settings,
+  Calendar,
   Share2,
 } from 'lucide-react';
 
@@ -41,16 +39,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const teacherNav = [
-    { id: 'dashboard', label: 'Class Dashboard', icon: <LayoutGrid className="w-4 h-4" /> },
-    { id: 'classroom', label: 'Classroom 2A', icon: <Users className="w-4 h-4" /> },
-    { id: 'misconceptions', label: 'Misconceptions', icon: <AlertTriangle className="w-4 h-4" /> },
-    { id: 'assignments', label: 'Assignments', icon: <ClipboardList className="w-4 h-4" /> },
-    { id: 'reports', label: 'Progress Reports', icon: <FileText className="w-4 h-4" /> },
-    { id: 'packs', label: 'Subject Packs', icon: <FolderKanban className="w-4 h-4" /> },
-    { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
+    { id: 'dashboard', label: 'Class map', icon: <LayoutGrid className="w-4 h-4" /> },
+    { id: 'assignments', label: 'Quizzes and work', icon: <ClipboardList className="w-4 h-4" /> },
+    { id: 'groups', label: 'Groups', icon: <Users className="w-4 h-4" /> },
+    { id: 'weekend', label: 'Weekend session', icon: <Calendar className="w-4 h-4" /> },
   ];
 
-  const navItems = isTeacher ? teacherNav : studentNav;
+  const parentNav = [
+    { id: 'summary', label: 'This week', icon: <Home className="w-4 h-4" /> },
+    { id: 'digest', label: 'Weekly note', icon: <FileText className="w-4 h-4" /> },
+    { id: 'link', label: 'Link a child', icon: <Users className="w-4 h-4" /> },
+  ];
+
+  const navItems = isTeacher ? teacherNav : variant === 'parent' ? parentNav : studentNav;
 
   return (
     <aside
@@ -62,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <div>
         <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
-          {isTeacher ? 'Command Center' : 'Learning Studio'}
+          {isTeacher ? 'Command Center' : variant === 'parent' ? 'Your child' : 'Learning Studio'}
         </p>
 
         <nav className="space-y-1">

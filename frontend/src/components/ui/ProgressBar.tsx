@@ -59,7 +59,7 @@ export const StrengthMeter: React.FC<StrengthMeterProps> = ({ strength, classNam
       color: 'bg-[#0BAA7B]',
       text: 'text-[#0BAA7B]',
       width: 'w-full',
-      label: 'Strong Evidence (Probe confirmed)',
+      label: 'Strong evidence. The idea is still suspected until a teacher accepts it.',
     },
   }[strength];
 

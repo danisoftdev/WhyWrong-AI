@@ -8,7 +8,7 @@ import { Sidebar } from './components/ui/Sidebar';
 import { LoginModal } from './components/ui/LoginModal';
 import { LandingPage } from './features/landing/LandingPage';
 import { StudentDashboard } from './features/student/StudentDashboard';
-import { QuizFlow } from './features/quiz/QuizFlow';
+import { QuizFlow, type AssignedWork } from './features/quiz/QuizFlow';
 import { TeacherDashboard } from './features/teacher/TeacherDashboard';
 import { ParentPortal } from './features/parent/ParentPortal';
 import { ProgressPage } from './features/progress/ProgressPage';
@@ -19,20 +19,15 @@ import { Card } from './components/ui/Card';
 import { Shield, Sparkles, Activity, CheckCircle2, Zap } from 'lucide-react';
 
 export function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'usr-student-01',
-    role: 'student',
-    display_name: 'Kofi Mensah',
-    student_code: 'STU-1001',
-    email: 'kofi@student.edu',
-    is_demo: true,
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [currentTab, setCurrentTab] = useState<string>('learn');
   const [isTakingQuiz, setIsTakingQuiz] = useState<boolean>(false);
   const [selectedSubjectSlug, setSelectedSubjectSlug] = useState<string>('mathematics');
+  const [activeAssignment, setActiveAssignment] = useState<AssignedWork | null>(null);
   const [showDesignSystem, setShowDesignSystem] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [aiHealth, setAiHealth] = useState<any>(null);
 
@@ -58,6 +53,7 @@ export function App() {
   const handleSwitchRole = async (role: Role) => {
     setShowDesignSystem(false);
     setIsTakingQuiz(false);
+    setActiveAssignment(null);
 
     if (role === 'visitor') {
       setCurrentUser(null);
@@ -128,26 +124,25 @@ export function App() {
   if (!currentUser || currentUser.role === 'visitor') {
     return (
       <div className="min-h-screen bg-[#0B1020]">
-        {process.env.REACT_APP_DEMO_MODE === 'true' && (
-          <DemoBar
-            currentUser={currentUser}
-            onSwitchRole={handleSwitchRole}
-            onOpenDesignSystem={() => setShowDesignSystem(true)}
-          />
-        )}
         <LandingPage
           onStartLearning={() => handleSwitchRole('student')}
           onExploreTeacher={() => handleSwitchRole('teacher')}
           onExploreParent={() => handleSwitchRole('parent')}
-          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onOpenLogin={() => {
+            setAuthMode('signin');
+            setIsLoginModalOpen(true);
+          }}
+          onCreateParent={() => {
+            setAuthMode('register');
+            setIsLoginModalOpen(true);
+          }}
         />
         <LoginModal
           isOpen={isLoginModalOpen}
+          mode={authMode}
           onClose={() => setIsLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
-      <Footer />
-<Footer />
       </div>
     );
   }
@@ -156,7 +151,7 @@ export function App() {
   if (currentUser.role === 'teacher') {
     return (
       <div className="min-h-screen bg-[#0C1421] text-white">
-        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+        {import.meta.env.VITE_DEMO_MODE === 'true' && (
           <DemoBar
             currentUser={currentUser}
             onSwitchRole={handleSwitchRole}
@@ -178,7 +173,7 @@ export function App() {
             className="hidden md:flex"
           />
           <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-            <TeacherDashboard />
+            <TeacherDashboard tab={currentTab} onTab={setCurrentTab} />
           </main>
         </div>
         <LoginModal
@@ -195,7 +190,7 @@ export function App() {
   if (currentUser.role === 'parent') {
     return (
       <div className="min-h-screen bg-[#F7F9FC] text-slate-800">
-        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+        {import.meta.env.VITE_DEMO_MODE === 'true' && (
           <DemoBar
             currentUser={currentUser}
             onSwitchRole={handleSwitchRole}
@@ -204,7 +199,7 @@ export function App() {
         )}
         <TopBar
           user={currentUser}
-          variant="student"
+          variant="parent"
           onNavigateHome={() => setCurrentTab('summary')}
           onOpenLogin={() => setIsLoginModalOpen(true)}
           onLogout={handleLogout}
@@ -213,11 +208,11 @@ export function App() {
           <Sidebar
             currentTab={currentTab}
             onSelectTab={(tab) => setCurrentTab(tab)}
-            variant="student"
+            variant="parent"
             className="hidden md:flex"
           />
           <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-            <ParentPortal />
+            <ParentPortal tab={currentTab} onTab={setCurrentTab} />
           </main>
         </div>
         <LoginModal
@@ -234,7 +229,7 @@ export function App() {
   if (currentUser.role === 'admin') {
     return (
       <div className="min-h-screen bg-[#0C1421] text-white">
-        {process.env.REACT_APP_DEMO_MODE === 'true' && (
+        {import.meta.env.VITE_DEMO_MODE === 'true' && (
           <DemoBar
             currentUser={currentUser}
             onSwitchRole={handleSwitchRole}
@@ -325,7 +320,7 @@ export function App() {
   // 5. STUDENT STUDIO (Default Light Studio #F7F9FC)
   return (
     <div className="min-h-screen bg-[#F7F9FC] text-slate-800 flex flex-col">
-{process.env.REACT_APP_DEMO_MODE === 'true' && (
+{import.meta.env.VITE_DEMO_MODE === 'true' && (
         <DemoBar
           currentUser={currentUser}
           onSwitchRole={handleSwitchRole}
@@ -358,7 +353,13 @@ export function App() {
           {isTakingQuiz || currentTab === 'learn' ? (
             <QuizFlow
               subjectSlug={selectedSubjectSlug}
-              onFinish={() => setIsTakingQuiz(false)}
+              learnerName={currentUser.display_name}
+              assignment={activeAssignment}
+              onFinish={() => {
+                setIsTakingQuiz(false);
+                setActiveAssignment(null);
+                setCurrentTab('home');
+              }}
             />
           ) : currentTab === 'progress' ? (
             <ProgressPage />
@@ -369,12 +370,19 @@ export function App() {
           ) : (
             <StudentDashboard
               subjects={subjects}
+              learnerName={currentUser.display_name}
               onSelectSubject={(slug) => {
+                setActiveAssignment(null);
                 setSelectedSubjectSlug(slug);
                 setIsTakingQuiz(true);
               }}
               onOpenQuickQuiz={() => {
+                setActiveAssignment(null);
                 setSelectedSubjectSlug('mathematics');
+                setIsTakingQuiz(true);
+              }}
+              onOpenAssignment={(work) => {
+                setActiveAssignment(work);
                 setIsTakingQuiz(true);
               }}
             />

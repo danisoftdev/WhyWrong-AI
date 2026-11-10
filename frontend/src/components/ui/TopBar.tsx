@@ -8,7 +8,7 @@ interface TopBarProps {
   onNavigateHome?: () => void;
   onOpenLogin?: () => void;
   onLogout?: () => void;
-  variant?: 'student' | 'teacher' | 'admin' | 'landing',
+  variant?: 'student' | 'teacher' | 'parent' | 'admin' | 'landing',
 }
 
 export const TopBar: React.FC<TopBarProps> = ({

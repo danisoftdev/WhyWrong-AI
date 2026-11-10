@@ -15,13 +15,21 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
     credentials: 'include',
   });
 
-  const data = await res.json();
+  const raw = await res.text();
+  let data: any = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error('The server did not answer. Sign in where the API is running.');
+    }
+  }
   if (data.csrf_token) {
     csrfToken = data.csrf_token;
   }
 
-  if (!res.ok) {
-    throw new Error(data.message || `API error ${res.status}`);
+  if (!res.ok || raw === '') {
+    throw new Error(data.message || 'The server did not answer. Sign in where the API is running.');
   }
 
   return data;
@@ -121,6 +129,17 @@ export const api = {
   },
 
   // Learning Loop
+  async listMyWork(): Promise<{ assignments: any[] }> {
+    return fetchApi('/api/student/work');
+  },
+
+  async submitWorkResponse(assignmentId: string, answerText: string, evidenceQuote: string): Promise<any> {
+    return fetchApi(`/api/student/work/${assignmentId}/responses`, {
+      method: 'POST',
+      body: JSON.stringify({ answer_text: answerText, evidence_quote: evidenceQuote }),
+    });
+  },
+
   async submitAttempt(
     questionId: string,
     selectedOptionId: string,
@@ -188,14 +207,63 @@ export const api = {
   },
 
   // Teacher
-  async getTeacherHeatmap(classId = 'cls-math-form2'): Promise<any> {
+  async listClasses(): Promise<any> {
+    return fetchApi('/api/classes');
+  },
+
+  async createClass(name: string, level: string): Promise<any> {
+    return fetchApi('/api/classes', {
+      method: 'POST',
+      body: JSON.stringify({ name, level }),
+    });
+  },
+
+  async getTeacherHeatmap(classId: string): Promise<any> {
     return fetchApi(`/api/classes/${classId}/heatmap`);
   },
 
-  async reviewDiagnosis(diagnosisId: string, decision: 'accepted' | 'edited' | 'rejected', comment?: string): Promise<any> {
+  async listGroups(classId: string): Promise<any> {
+    return fetchApi(`/api/classes/${classId}/groups`);
+  },
+
+  async createGroup(classId: string, body: Record<string, unknown>): Promise<any> {
+    return fetchApi(`/api/classes/${classId}/groups`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async listAssignments(classId: string): Promise<any> {
+    return fetchApi(`/api/classes/${classId}/assignments`);
+  },
+
+  async createAssignment(classId: string, body: Record<string, unknown>): Promise<any> {
+    return fetchApi(`/api/classes/${classId}/assignments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async listSessions(classId: string): Promise<any> {
+    return fetchApi(`/api/classes/${classId}/sessions`);
+  },
+
+  async createSession(classId: string, body: Record<string, unknown>): Promise<any> {
+    return fetchApi(`/api/classes/${classId}/sessions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async reviewDiagnosis(
+    diagnosisId: string,
+    decision: 'accepted' | 'edited' | 'rejected',
+    comment?: string,
+    misconceptionId?: string,
+  ): Promise<any> {
     return fetchApi(`/api/diagnoses/${diagnosisId}/review`, {
       method: 'PATCH',
-      body: JSON.stringify({ decision, comment }),
+      body: JSON.stringify({ decision, comment, misconception_id: misconceptionId || '' }),
     });
   },
 
@@ -217,6 +285,10 @@ export const api = {
 
   async getParentSummary(studentId: string): Promise<any> {
     return fetchApi(`/api/parent/children/${studentId}/summary`);
+  },
+
+  async revokeChild(studentId: string): Promise<any> {
+    return fetchApi(`/api/parent/children/${studentId}/revoke`, { method: 'POST' });
   },
 
   // Report

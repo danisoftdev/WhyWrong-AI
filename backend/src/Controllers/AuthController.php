@@ -165,8 +165,8 @@ class AuthController
         $password = (string)$request->get('password', '');
         $displayName = trim((string)$request->get('display_name', ''));
 
-        if (!in_array($role, ['parent', 'teacher', 'student', 'admin'], true)) {
-            $response->error('Role must be parent, teacher, student, or admin.', 'VALIDATION_ERROR', 422);
+        if (!in_array($role, ['parent', 'student'], true)) {
+            $response->error('Open registration is for a parent account. School staff are added by an administrator.', 'FORBIDDEN', 403);
             return;
         }
 
@@ -233,6 +233,14 @@ class AuthController
         $_SESSION['role'] = $role;
         $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
 
+        try {
+            $this->db->execute(
+                "INSERT INTO consents (id, user_id, subject_student_id, consent_type, version, granted_at)
+                 VALUES (?, ?, NULL, 'terms', '1.0', NOW())",
+                ['cns-' . bin2hex(random_bytes(8)), $userId]
+            );
+        } catch (\Throwable $e) {}
+
         $response->json([
             'status' => 'success',
             'user' => [
@@ -241,7 +249,7 @@ class AuthController
                 'display_name' => $displayName,
                 'email'        => $email,
                 'student_code' => $studentCode,
-                'is_demo'      => true,
+                'is_demo'      => false,
             ],
             'csrf_token' => $_SESSION['csrf_token'],
             'message' => 'Account successfully registered and signed in.',

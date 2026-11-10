@@ -8,17 +8,28 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: User) => void;
+  mode?: 'signin' | 'register';
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
+  mode = 'signin',
 }) => {
-  const [identifier, setIdentifier] = useState<string>('STU-1001');
-  const [password, setPassword] = useState<string>('1001');
+  const [view, setView] = useState<'signin' | 'register'>(mode);
+  const [identifier, setIdentifier] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [displayName, setDisplayName] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setView(mode);
+      setErrorMsg('');
+    }
+  }, [isOpen, mode]);
 
   if (!isOpen) return null;
 
@@ -28,15 +39,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setLoading(true);
 
     try {
-      const res = await api.login(identifier, password);
+      const res = view === 'register'
+        ? await api.register('parent', displayName, identifier, password)
+        : await api.login(identifier, password);
       if (res && res.user) {
         onLoginSuccess(res.user);
         onClose();
       } else {
-        setErrorMsg('Invalid login credentials. Please try again.');
+        setErrorMsg('That sign-in could not be completed.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Invalid credentials or account temporarily locked.');
+      setErrorMsg(err.message || 'That sign-in could not be completed.');
     } finally {
       setLoading(false);
     }
@@ -66,10 +79,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </div>
           <div>
             <h3 className="text-xl font-bold font-display text-slate-900 dark:text-white">
-              Sign In to WhyWrong
+              {view === 'register' ? 'Create a parent account' : 'Sign in to WhyWrong'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Enter your student code or staff credentials
+              {view === 'register'
+                ? 'Then link your child with a code from their teacher.'
+                : 'Use your email, or a student code and PIN.'}
             </p>
           </div>
         </div>
@@ -82,30 +97,47 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {view === 'register' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Your name
+              </label>
+              <input
+                type="text"
+                required
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="The name your child knows you by"
+                className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#734DFD] text-slate-900 dark:text-white"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Student Code or Email Address:
+              {view === 'register' ? 'Email' : 'Student code or email'}
             </label>
             <input
-              type="text"
+              type={view === 'register' ? 'email' : 'text'}
               required
+              minLength={view === 'register' ? 3 : 1}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. STU-1001 or teacher@school.edu"
+              placeholder={view === 'register' ? 'you@example.com' : 'e.g. STU-1001 or teacher@school.edu'}
               className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#734DFD] text-slate-900 dark:text-white"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Password or 4-Digit Student PIN:
+              {view === 'register' ? 'Password' : 'Password or 4-digit student PIN'}
             </label>
             <input
               type="password"
               required
+              minLength={view === 'register' ? 8 : 4}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="e.g. 1001 or DemoPass2026!"
+              placeholder={view === 'register' ? 'At least 8 characters' : 'e.g. 1001 or DemoPass2026!'}
               className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#734DFD] text-slate-900 dark:text-white"
             />
           </div>
@@ -117,12 +149,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               disabled={loading}
               className="w-full py-3 font-bold text-sm shadow-md"
             >
-              {loading ? 'Authenticating...' : 'Sign In Securely'}
+              {loading ? 'Please wait…' : view === 'register' ? 'Create account' : 'Sign in'}
             </Button>
           </div>
         </form>
 
-        {/* Quick Demo Fill Buttons for Judges */}
+        <button
+          type="button"
+          onClick={() => {
+            setView(view === 'register' ? 'signin' : 'register');
+            setErrorMsg('');
+          }}
+          className="mt-4 text-xs font-semibold text-[#734DFD] hover:underline"
+        >
+          {view === 'register' ? 'Already have an account? Sign in' : 'New here? Create a parent account'}
+        </button>
+
+        {view === 'signin' && (
         <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2.5 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#22D3EE]" /> Judge Quick Fill Accounts:
@@ -158,6 +201,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </button>
           </div>
         </div>
+        )}
 
         {/* Security Notice */}
         <div className="mt-4 flex items-center gap-2 text-[10px] text-slate-400">

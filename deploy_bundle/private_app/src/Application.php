@@ -74,6 +74,8 @@ class Application
 
         // Attempts
         $r->post('/api/attempts',          'AttemptController@store',       roles: ['student']);
+        $r->get('/api/student/work',       'StudentWorkController@list',    roles: ['student']);
+        $r->post('/api/student/work/{id}/responses', 'StudentWorkController@respond', roles: ['student']);
 
         // Diagnoses
         $r->post('/api/diagnoses',         'DiagnosisController@store',      roles: ['student']);
@@ -92,6 +94,12 @@ class Application
         $r->post('/api/classes',           'ClassController@store',         roles: ['teacher']);
         $r->get('/api/classes/{id}/heatmap', 'ClassController@heatmap',     roles: ['teacher']);
         $r->post('/api/classes/{id}/roster', 'ClassController@roster',      roles: ['teacher']);
+        $r->get('/api/classes/{id}/groups',  'ClassroomController@groups',  roles: ['teacher']);
+        $r->post('/api/classes/{id}/groups', 'ClassroomController@createGroup', roles: ['teacher']);
+        $r->get('/api/classes/{id}/assignments', 'ClassroomController@assignments', roles: ['teacher']);
+        $r->post('/api/classes/{id}/assignments', 'ClassroomController@createAssignment', roles: ['teacher']);
+        $r->get('/api/classes/{id}/sessions', 'ClassroomController@sessions', roles: ['teacher']);
+        $r->post('/api/classes/{id}/sessions', 'ClassroomController@createSession', roles: ['teacher']);
 
         // Students & Link Codes
         $r->post('/api/students/{id}/link-codes', 'LinkCodeController@generate',   roles: ['teacher']);
@@ -100,6 +108,7 @@ class Application
         // Parent
         $r->post('/api/parent/link',                'ParentController@link',          roles: ['parent']);
         $r->get('/api/parent/children',             'ParentController@children',      roles: ['parent']);
+        $r->post('/api/parent/children',            'ParentController@createChild',   roles: ['parent']);
         $r->get('/api/parent/children/{id}/summary', 'ParentController@summary',      roles: ['parent']);
         $r->post('/api/parent/children/{id}/revoke', 'ParentController@revoke',       roles: ['parent']);
 
@@ -108,6 +117,7 @@ class Application
 
         // Administrator Routes
         $r->get('/api/admin/users',                         'AdminController@users',                 roles: ['admin']);
+        $r->post('/api/admin/teachers',                     'AdminController@createTeacher',         roles: ['admin']);
         $r->get('/api/admin/ai-health',                     'AdminController@aiHealth',              roles: ['admin']);
         $r->get('/api/admin/audit-logs',                    'AdminController@auditLogs',             roles: ['admin']);
         $r->get('/api/admin/evaluations',                   'AdminController@evaluations',           roles: ['admin']);

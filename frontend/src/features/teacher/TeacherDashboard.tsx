@@ -1,417 +1,604 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { KpiTile } from '../../components/ui/KpiTile';
-import { HeatmapCell, type MasteryLevel } from '../../components/ui/HeatmapCell';
 import {
   Users,
   AlertTriangle,
-  Award,
-  Zap,
   CheckCircle2,
   XCircle,
-  FileText,
   KeyRound,
-  Filter,
-  Download,
-  Calendar,
-  Sparkles,
+  Pencil,
 } from 'lucide-react';
 import { api } from '../../services/api';
 
-export const TeacherDashboard: React.FC = () => {
-  const [heatmapData, setHeatmapData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [generatedLinkCode, setGeneratedLinkCode] = useState<{ studentCode: string; code: string } | null>(null);
-  const [showInterventionModal, setShowInterventionModal] = useState<boolean>(false);
-  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+interface TeacherDashboardProps {
+  tab?: string;
+  onTab?: (tab: string) => void;
+}
 
-  useEffect(() => {
-    loadData();
-  }, []);
+function formatLongDate(value?: string | null): string {
+  if (!value) return 'No date set';
+  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
-  const loadData = async () => {
+const fieldClass = 'w-full text-sm px-3.5 py-2.5 rounded-xl border border-[#1E2D4A] bg-[#0C1421] text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#734DFD]';
+
+export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ tab = 'dashboard', onTab }) => {
+  const activeTab = tab === 'assignments' || tab === 'groups' || tab === 'weekend' ? tab : 'dashboard';
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classId, setClassId] = useState('');
+  const [map, setMap] = useState<any>(null);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [work, setWork] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [className, setClassName] = useState('');
+  const [classLevel, setClassLevel] = useState('');
+  const [linkCode, setLinkCode] = useState<{ name: string; code: string; expires: string } | null>(null);
+  const [editing, setEditing] = useState<any>(null);
+  const [editIdea, setEditIdea] = useState('');
+  const [editComment, setEditComment] = useState('');
+
+  const [workTitle, setWorkTitle] = useState('');
+  const [workKind, setWorkKind] = useState<'quiz' | 'worksheet'>('quiz');
+  const [workSubject, setWorkSubject] = useState('');
+  const [workPrompt, setWorkPrompt] = useState('');
+  const [workDue, setWorkDue] = useState('');
+  const [workAudience, setWorkAudience] = useState<'class' | 'group'>('class');
+  const [workGroup, setWorkGroup] = useState('');
+
+  const [groupName, setGroupName] = useState('');
+  const [groupKind, setGroupKind] = useState<'custom' | 'idea'>('custom');
+  const [groupIdea, setGroupIdea] = useState('');
+  const [groupMembers, setGroupMembers] = useState<string[]>([]);
+
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [sessionWhen, setSessionWhen] = useState('');
+  const [sessionUrl, setSessionUrl] = useState('');
+  const [sessionActivity, setSessionActivity] = useState('');
+  const [sessionGroup, setSessionGroup] = useState('');
+  const [rosterNames, setRosterNames] = useState('');
+  const [newLearners, setNewLearners] = useState<any[]>([]);
+
+  const go = (next: string) => onTab?.(next);
+
+  const say = (message: string) => {
+    setNotice(message);
+    setError('');
+  };
+
+  const fail = (err: any, fallback: string) => {
+    setError(err?.message || fallback);
+    setNotice('');
+  };
+
+  const loadClass = async (id: string) => {
+    const [heatmap, groupRes, workRes, sessionRes] = await Promise.all([
+      api.getTeacherHeatmap(id),
+      api.listGroups(id).catch((err) => ({ groups: [], error: err.message })),
+      api.listAssignments(id).catch((err) => ({ assignments: [], error: err.message })),
+      api.listSessions(id).catch((err) => ({ sessions: [], error: err.message })),
+    ]);
+    setMap(heatmap);
+    setGroups(groupRes.groups || []);
+    setWork(workRes.assignments || []);
+    setSessions(sessionRes.sessions || []);
+    const tableError = groupRes.error || workRes.error || sessionRes.error;
+    if (tableError) setError(tableError);
+  };
+
+  const load = async () => {
     try {
       setLoading(true);
-      const data = await api.getTeacherHeatmap();
-      setHeatmapData(data);
-    } catch {
-      // Fallback demonstration dataset
-      setHeatmapData({
-        kpis: {
-          total_students: 24,
-          active_misconceptions: 3,
-          concept_mastery_pct: 74,
-          recommended_interventions: 2,
-          is_demo_data: true,
-        },
-        common_misconceptions: [
-          { id: 'm1', label: 'Add tops, add bottoms', student_count: 8, percentage: 33 },
-          { id: 'm2', label: 'Larger denominator means larger fraction', student_count: 5, percentage: 21 },
-          { id: 'm3', label: 'Constant velocity requires active force', student_count: 4, percentage: 17 },
-        ],
-        heatmap_grid: [
-          { topic: 'Fractions: Addition', status: 'Okay', strong: 14, okay: 6, weak: 4 },
-          { topic: 'Fractions: Comparison', status: 'Strong', strong: 18, okay: 4, weak: 2 },
-          { topic: 'Forces: Constant Motion', status: 'Weak', strong: 8, okay: 10, weak: 6 },
-          { topic: 'Computing: Loop Bounds', status: 'Strong', strong: 16, okay: 5, weak: 3 },
-        ],
-        students: [
-          {
-            id: 'usr-student-01',
-            student_code: 'STU-1001',
-            display_name: 'Kofi Mensah',
-            active_count: 1,
-            diagnoses: [
-              {
-                id: 'diag-demo-kofi-01',
-                misconception_label: 'Add tops, add bottoms',
-                evidence_quote: '1/3 + 1/4 = 2/7',
-                evidence_strength: 'moderate',
-                state: 'suspected',
-              },
-            ],
-          },
-          {
-            id: 'usr-student-02',
-            student_code: 'STU-1002',
-            display_name: 'Ama Osei',
-            active_count: 1,
-            diagnoses: [
-              {
-                id: 'diag-seed-02',
-                misconception_label: 'Larger denominator means larger fraction',
-                evidence_quote: '1/8 > 1/4',
-                evidence_strength: 'moderate',
-                state: 'suspected',
-              },
-            ],
-          },
-        ],
-      });
+      setError('');
+      const res = await api.listClasses();
+      const list = res.classes || [];
+      setClasses(list);
+      const id = classId && list.some((item: any) => item.id === classId) ? classId : list[0]?.id || '';
+      setClassId(id);
+      if (id) await loadClass(id);
+      else setMap(null);
+    } catch (err: any) {
+      setClasses([]);
+      setMap(null);
+      fail(err, 'Sign in with a teacher account to open your class.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReview = async (diagId: string, decision: 'accepted' | 'rejected') => {
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleCreateClass = async (event: React.FormEvent) => {
+    event.preventDefault();
     try {
-      await api.reviewDiagnosis(diagId, decision, `Reviewed by teacher (${decision})`);
-      setReviewMessage(`Diagnosis ${decision} successfully. Parent digest and student dashboard updated.`);
-      setTimeout(() => setReviewMessage(null), 4000);
-      loadData();
-    } catch {
-      setReviewMessage(`Diagnosis ${decision} recorded.`);
-      setTimeout(() => setReviewMessage(null), 4000);
+      const res = await api.createClass(className.trim(), classLevel.trim());
+      setClassName('');
+      setClassLevel('');
+      say(`Class “${res.class?.name || className}” is ready.`);
+      setClassId(res.class?.id || '');
+      await load();
+    } catch (err: any) {
+      fail(err, 'The class could not be created.');
     }
   };
 
-  const handleGenerateLinkCode = async (studentId: string, studentCode: string) => {
+  const handleReview = async (diagnosis: any, decision: 'accepted' | 'rejected' | 'edited') => {
     try {
-      const res = await api.generateLinkCode(studentId);
-      setGeneratedLinkCode({ studentCode, code: res.code });
-    } catch {
-      setGeneratedLinkCode({ studentCode, code: 'WW-9182' });
+      await api.reviewDiagnosis(
+        diagnosis.id,
+        decision,
+        decision === 'edited' ? editComment : `Teacher ${decision} this case.`,
+        decision === 'edited' ? editIdea : undefined,
+      );
+      setEditing(null);
+      say(decision === 'accepted'
+        ? 'Accepted. A parent of this child can now see this idea.'
+        : decision === 'rejected'
+          ? 'Rejected. This case stays off the parent note.'
+          : 'Edited. The case stays suspected until you accept it.');
+      if (classId) await loadClass(classId);
+    } catch (err: any) {
+      fail(err, 'The review could not be saved.');
     }
   };
 
-  const kpis = heatmapData?.kpis || {
-    total_students: 24,
-    active_misconceptions: 3,
-    concept_mastery_pct: 74,
-    recommended_interventions: 2,
+  const handleLinkCode = async (student: any) => {
+    try {
+      const res = await api.generateLinkCode(student.id);
+      setLinkCode({
+        name: student.display_name,
+        code: res.code,
+        expires: res.expires_at,
+      });
+      say('Parent code created. It works once, for this child only.');
+    } catch (err: any) {
+      setLinkCode(null);
+      fail(err, 'A parent code could not be created for this learner.');
+    }
   };
+
+  const handleCreateWork = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!classId) return;
+    try {
+      await api.createAssignment(classId, {
+        title: workTitle.trim(),
+        kind: workKind,
+        subject_label: workSubject.trim(),
+        prompt: workPrompt.trim(),
+        due_at: workDue,
+        audience: workAudience,
+        group_id: workAudience === 'group' ? workGroup : '',
+      });
+      setWorkTitle('');
+      setWorkPrompt('');
+      setWorkDue('');
+      say('The work is stored. Learners answer it from the student desk in the next step.');
+      await loadClass(classId);
+    } catch (err: any) {
+      fail(err, 'The work could not be saved.');
+    }
+  };
+
+  const handleCreateGroup = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!classId) return;
+    try {
+      const res = await api.createGroup(classId, {
+        name: groupName.trim(),
+        kind: groupKind,
+        idea_label: groupIdea,
+        student_ids: groupMembers,
+      });
+      setGroupName('');
+      setGroupMembers([]);
+      say(groupKind === 'idea'
+        ? `Idea group saved with ${res.group?.member_count ?? 0} learners who share that idea.`
+        : 'Group saved.');
+      await loadClass(classId);
+    } catch (err: any) {
+      fail(err, 'The group could not be saved.');
+    }
+  };
+
+  const handleCreateSession = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!classId) return;
+    try {
+      await api.createSession(classId, {
+        title: sessionTitle.trim(),
+        starts_at: sessionWhen,
+        call_url: sessionUrl.trim(),
+        activity: sessionActivity.trim(),
+        group_id: sessionGroup,
+      });
+      setSessionTitle('');
+      setSessionWhen('');
+      setSessionUrl('');
+      setSessionActivity('');
+      say('Session saved. Share the call link. The activity stays in WhyWrong.');
+      await loadClass(classId);
+    } catch (err: any) {
+      fail(err, 'The session could not be saved.');
+    }
+  };
+
+  const handleAddLearners = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!classId) return;
+    const students = rosterNames
+      .split('\n')
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .map((display_name) => ({ display_name }));
+    if (students.length === 0) return;
+    try {
+      const res = await api.createStudentRoster(classId, students);
+      setNewLearners(res.students || []);
+      setRosterNames('');
+      say('Learners added. Give each one the code and PIN shown here. The PIN is not shown again.');
+      await loadClass(classId);
+    } catch (err: any) {
+      fail(err, 'The learners could not be added.');
+    }
+  };
+
+  const toggleMember = (id: string) => {
+    setGroupMembers((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const kpis = map?.kpis || {};
+  const students = map?.students || [];
+  const ideas = map?.common_misconceptions || [];
+  const topics = map?.heatmap_grid || [];
+  const packIdeas = map?.pack_ideas || [];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-16 text-slate-100">
-      {/* Top Header & Filters */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-6 border-b border-[#1E2D4A] gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-100">
+      <div className="flex flex-col gap-4 border-b border-[#1E2D4A] pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#22D3EE] bg-[#22D3EE]/10 px-2.5 py-0.5 rounded-full border border-[#22D3EE]/20">
-              Teacher Command Center
-            </span>
-            <span className="text-xs text-amber-400 font-medium">
-              • Seeded Demonstration Data (Class 2A)
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-white mt-1">
-            Class Misconception Map
-          </h1>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#22D3EE]">Teacher</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-white mt-1">Classroom</h1>
+          {kpis.is_demo_data && (
+            <p className="text-xs text-amber-300 mt-1">{kpis.demo_label}</p>
+          )}
         </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#111E38] border border-[#1E2D4A] text-xs">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span>Subject: <strong>Mathematics</strong></span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#111E38] border border-[#1E2D4A] text-xs">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>Date: <strong>This Week</strong></span>
-          </div>
-          <Button variant="gradient" size="sm" onClick={() => setShowInterventionModal(true)}>
-            <Zap className="w-3.5 h-3.5 mr-1.5" /> Generate Intervention (5 mins)
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          {[
+            ['dashboard', 'Class map'],
+            ['assignments', 'Quizzes and work'],
+            ['groups', 'Groups'],
+            ['weekend', 'Weekend session'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => go(id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold ${
+                activeTab === id ? 'bg-[#734DFD] text-white' : 'bg-[#111E38] text-slate-300 border border-[#1E2D4A]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {reviewMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" /> {reviewMessage}
-        </div>
+      {notice && (
+        <div className="p-3 rounded-xl bg-[#0BAA7B]/10 border border-[#0BAA7B]/30 text-[#0BAA7B] text-sm">{notice}</div>
+      )}
+      {error && (
+        <div className="p-3 rounded-xl bg-[#E5484D]/10 border border-[#E5484D]/30 text-[#E5484D] text-sm">{error}</div>
       )}
 
-      {/* 4 KPI Tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiTile
-          label="Total Students"
-          value={kpis.total_students}
-          subtext="24 enrolled in Form 2A"
-          icon={<Users className="w-5 h-5" />}
-        />
-        <KpiTile
-          label="Active Misconceptions"
-          value={kpis.active_misconceptions}
-          subtext="3 detected patterns"
-          icon={<AlertTriangle className="w-5 h-5 text-amber-400" />}
-        />
-        <KpiTile
-          label="Concept Mastery"
-          value={`${kpis.concept_mastery_pct}%`}
-          badge="+8% this term"
-          subtext="Class average accuracy"
-          icon={<Award className="w-5 h-5 text-emerald-400" />}
-        />
-        <KpiTile
-          label="Interventions"
-          value={kpis.recommended_interventions}
-          subtext="Actionable 5-min drills"
-          icon={<Zap className="w-5 h-5 text-[#22D3EE]" />}
-        />
-      </div>
+      {loading && <p className="text-sm text-slate-400">Loading your class…</p>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Common Misconceptions Ranked List */}
-        <div className="lg:col-span-6 space-y-4">
-          <Card variant="teacher" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold font-display text-white">
-                Common Misconceptions (Ranked)
-              </h2>
-              <span className="text-xs text-slate-400">by student count</span>
-            </div>
+      {!loading && classes.length === 0 && (
+        <Card variant="teacher" className="space-y-4 max-w-xl">
+          <h2 className="text-lg font-bold font-display">Create a class</h2>
+          <p className="text-sm text-slate-400">A class holds the roster, the work, the groups, and the weekend session.</p>
+          <form onSubmit={handleCreateClass} className="space-y-3">
+            <input required value={className} onChange={(e) => setClassName(e.target.value)} placeholder="Class name" className={fieldClass} />
+            <input value={classLevel} onChange={(e) => setClassLevel(e.target.value)} placeholder="Year or form, optional" className={fieldClass} />
+            <Button type="submit" variant="gradient">Create class</Button>
+          </form>
+        </Card>
+      )}
 
-            <div className="space-y-4 pt-1">
-              {heatmapData?.common_misconceptions?.map((misc: any) => (
-                <div key={misc.id} className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-100">{misc.label}</span>
-                    <span className="font-mono text-[#22D3EE] font-bold">
-                      {misc.student_count} students ({misc.percentage}%)
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-[#111E38] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#734DFD] to-[#22D3EE] rounded-full"
-                      style={{ width: `${misc.percentage}%` }}
-                    />
-                  </div>
+      {!loading && classes.length > 0 && (
+        <label className="block text-xs text-slate-400">
+          Class
+          <select
+            value={classId}
+            onChange={async (e) => {
+              setClassId(e.target.value);
+              try {
+                await loadClass(e.target.value);
+              } catch (err: any) {
+                fail(err, 'That class could not be opened.');
+              }
+            }}
+            className={`${fieldClass} mt-1 max-w-sm`}
+          >
+            {classes.map((item) => (
+              <option key={item.id} value={item.id}>{item.name}{item.level ? ` · ${item.level}` : ''}</option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {activeTab === 'dashboard' && map && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card variant="teacher">
+              <p className="text-xs text-slate-400">Learners</p>
+              <p className="text-3xl font-black font-display mt-1">{kpis.total_students ?? 0}</p>
+            </Card>
+            <Card variant="teacher">
+              <p className="text-xs text-slate-400">Open cases</p>
+              <p className="text-3xl font-black font-display text-amber-300 mt-1">{kpis.open_cases ?? 0}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Still suspected until you accept them</p>
+            </Card>
+            <Card variant="teacher">
+              <p className="text-xs text-slate-400">Accepted ideas</p>
+              <p className="text-3xl font-black font-display text-[#0BAA7B] mt-1">{kpis.accepted_ideas ?? 0}</p>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card variant="teacher" className="space-y-3">
+              <h2 className="font-bold font-display">Ideas in this class</h2>
+              {ideas.length === 0 && <p className="text-sm text-slate-400">No open idea yet. The map fills from answers, not from a fixed topic list.</p>}
+              {ideas.map((idea: any) => (
+                <div key={idea.id} className="p-3 rounded-xl bg-[#0C1421] border border-[#1E2D4A] text-sm">
+                  <p className="font-semibold">{idea.label}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {idea.student_count} learner{Number(idea.student_count) === 1 ? '' : 's'}
+                    {idea.suppressed ? ' · share hidden while fewer than 3 learners have it' : idea.percentage != null ? ` · ${idea.percentage}% of the class` : ''}
+                  </p>
                 </div>
               ))}
-            </div>
+            </Card>
+
+            <Card variant="teacher" className="space-y-3">
+              <h2 className="font-bold font-display">Topics with cases</h2>
+              {topics.length === 0 && <p className="text-sm text-slate-400">No topic has a case yet.</p>}
+              {topics.map((topic: any) => (
+                <div key={topic.topic} className="p-3 rounded-xl bg-[#0C1421] border border-[#1E2D4A] flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{topic.topic}</p>
+                    <p className="text-xs text-slate-400">{topic.open_cases} open · {topic.accepted} accepted</p>
+                  </div>
+                  <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${Number(topic.open_cases) > 0 ? 'bg-amber-400/15 text-amber-300' : 'bg-[#0BAA7B]/15 text-[#0BAA7B]'}`}>
+                    {Number(topic.open_cases) > 0 ? 'Open' : 'Clear'}
+                  </span>
+                </div>
+              ))}
+            </Card>
+          </div>
+
+          <Card variant="teacher" className="space-y-3 max-w-xl">
+            <h2 className="font-bold font-display">Add learners</h2>
+            <p className="text-sm text-slate-400">One name on each line. Each learner gets a code and a PIN.</p>
+            <form onSubmit={handleAddLearners} className="space-y-3">
+              <textarea value={rosterNames} onChange={(e) => setRosterNames(e.target.value)} rows={4} placeholder={'Ama Mensah\nKofi Boateng'} className={fieldClass} />
+              <Button type="submit" variant="gradient">Add to this class</Button>
+            </form>
+            {newLearners.length > 0 && (
+              <div className="space-y-2">
+                {newLearners.map((learner) => (
+                  <p key={learner.id} className="text-sm font-mono">
+                    {learner.display_name}: {learner.student_code} · PIN {learner.pin}
+                  </p>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* Student Drill-Down & Review Flow */}
           <Card variant="teacher" className="space-y-4">
-            <h2 className="text-base font-bold font-display text-white flex items-center justify-between">
-              <span>Student Misconception Drill-Down</span>
-              <span className="text-xs font-normal text-slate-400">Teacher audit & approval</span>
-            </h2>
-
-            <div className="space-y-3">
-              {heatmapData?.students?.slice(0, 3).map((stu: any) => (
-                <div
-                  key={stu.id}
-                  className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">{stu.display_name}</span>
-                      <span className="text-[10px] font-mono bg-[#1E2D4A] px-2 py-0.5 rounded text-slate-300">
-                        {stu.student_code}
-                      </span>
-                    </div>
-                    {stu.diagnoses?.[0] && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Detected: <span className="text-amber-300 font-semibold">{stu.diagnoses[0].misconception_label}</span> (Evidence quote: <code className="text-cyan-300">{stu.diagnoses[0].evidence_quote}</code>)
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {stu.diagnoses?.[0] && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleReview(stu.diagnoses[0].id, 'accepted')}
-                          className="px-2.5 py-1.5 rounded-lg bg-[#0BAA7B]/20 text-[#0BAA7B] hover:bg-[#0BAA7B]/30 text-xs font-bold flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Accept
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReview(stu.diagnoses[0].id, 'rejected')}
-                          className="px-2.5 py-1.5 rounded-lg bg-[#E5484D]/20 text-[#E5484D] hover:bg-[#E5484D]/30 text-xs font-bold flex items-center gap-1"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleGenerateLinkCode(stu.id, stu.student_code)}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#22D3EE]/15 text-[#22D3EE] hover:bg-[#22D3EE]/25 text-xs font-bold flex items-center gap-1"
-                    >
-                      <KeyRound className="w-3.5 h-3.5" /> Parent Code
-                    </button>
-                  </div>
+            <h2 className="font-bold font-display">Cases to decide</h2>
+            {students.length === 0 && <p className="text-sm text-slate-400">Add learners from the roster when you are ready. This phase stores the class work first.</p>}
+            {students.map((student: any) => (
+              <div key={student.id} className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">{student.display_name} <span className="text-xs font-mono text-slate-400">{student.student_code}</span></p>
+                  <button type="button" onClick={() => handleLinkCode(student)} className="text-xs font-bold text-[#22D3EE] inline-flex items-center gap-1">
+                    <KeyRound className="w-3.5 h-3.5" /> Parent code
+                  </button>
                 </div>
-              ))}
-            </div>
-
-            {generatedLinkCode && (
-              <div className="p-4 rounded-xl bg-[#22D3EE]/10 border border-[#22D3EE]/30 text-xs space-y-1">
-                <p className="font-bold text-[#22D3EE]">
-                  Parent Link Code for {generatedLinkCode.studentCode}:
-                </p>
-                <p className="text-xl font-mono font-black text-white tracking-widest">
-                  {generatedLinkCode.code}
-                </p>
-                <p className="text-slate-400 text-[11px]">
-                  Share this code with the parent. Code expires in 7 days and links only this child.
-                </p>
+                {(student.diagnoses || []).length === 0 && <p className="text-xs text-slate-500">No case yet.</p>}
+                {(student.diagnoses || []).map((diagnosis: any) => (
+                  <div key={diagnosis.id} className="text-sm space-y-2 border-t border-[#1E2D4A] pt-3">
+                    <p>
+                      <span className="text-amber-200">{diagnosis.misconception_label || 'Unlabelled idea'}</span>
+                      <span className="text-slate-500"> · {diagnosis.state} · {diagnosis.evidence_strength}</span>
+                    </p>
+                    <p className="text-xs text-cyan-200 font-mono">“{diagnosis.evidence_quote}”</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => handleReview(diagnosis, 'accepted')} className="px-2.5 py-1.5 rounded-lg bg-[#0BAA7B]/20 text-[#0BAA7B] text-xs font-bold inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Accept
+                      </button>
+                      <button type="button" onClick={() => { setEditing(diagnosis); setEditIdea(''); setEditComment(''); }} className="px-2.5 py-1.5 rounded-lg bg-[#734DFD]/20 text-[#c4b5fd] text-xs font-bold inline-flex items-center gap-1">
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button type="button" onClick={() => handleReview(diagnosis, 'rejected')} className="px-2.5 py-1.5 rounded-lg bg-[#E5484D]/20 text-[#E5484D] text-xs font-bold inline-flex items-center gap-1">
+                        <XCircle className="w-3.5 h-3.5" /> Reject
+                      </button>
+                    </div>
+                    {editing?.id === diagnosis.id && (
+                      <form
+                        className="space-y-2"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          handleReview(diagnosis, 'edited');
+                        }}
+                      >
+                        <select required value={editIdea} onChange={(e) => setEditIdea(e.target.value)} className={fieldClass}>
+                          <option value="">Choose the idea this evidence supports</option>
+                          {packIdeas.filter((idea: any) => idea.id !== diagnosis.misconception_id).map((idea: any) => (
+                            <option key={idea.id} value={idea.id}>{idea.label}</option>
+                          ))}
+                        </select>
+                        <input value={editComment} onChange={(e) => setEditComment(e.target.value)} placeholder="Note for your records, optional" className={fieldClass} />
+                        <Button type="submit" variant="gradient" size="sm">Save edit</Button>
+                      </form>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {linkCode && (
+              <div className="p-4 rounded-xl bg-[#22D3EE]/10 border border-[#22D3EE]/30">
+                <p className="text-xs text-[#22D3EE] font-bold">Parent code for {linkCode.name}</p>
+                <p className="text-2xl font-mono font-black tracking-widest mt-1">{linkCode.code}</p>
+                <p className="text-xs text-slate-400 mt-1">Use by {formatLongDate(linkCode.expires)}. One child, one use.</p>
               </div>
             )}
           </Card>
         </div>
+      )}
 
-        {/* Right: Concept Mastery Heatmap Grid */}
-        <div className="lg:col-span-6 space-y-4">
-          <Card variant="teacher" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold font-display text-white">
-                  Concept Mastery Heatmap
-                </h2>
-                <p className="text-xs text-slate-400">Class 2A Topic Performance Matrix</p>
+      {activeTab === 'assignments' && classId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card variant="teacher" className="space-y-3">
+            <h2 className="font-bold font-display">Set a quiz or a worksheet</h2>
+            <p className="text-sm text-slate-400">The subject is a label. Any STEM question can be the prompt.</p>
+            <form onSubmit={handleCreateWork} className="space-y-3">
+              <input required value={workTitle} onChange={(e) => setWorkTitle(e.target.value)} placeholder="Title" className={fieldClass} />
+              <div className="grid grid-cols-2 gap-3">
+                <select value={workKind} onChange={(e) => setWorkKind(e.target.value as 'quiz' | 'worksheet')} className={fieldClass}>
+                  <option value="quiz">Quiz</option>
+                  <option value="worksheet">Worksheet</option>
+                </select>
+                <input required value={workSubject} onChange={(e) => setWorkSubject(e.target.value)} placeholder="Subject" className={fieldClass} />
               </div>
-
-              {/* Legend */}
-              <div className="flex items-center gap-3 text-[11px]">
-                <span className="flex items-center gap-1 text-[#0BAA7B]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0BAA7B]" /> Strong
-                </span>
-                <span className="flex items-center gap-1 text-[#F48B2C]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#F48B2C]" /> Okay
-                </span>
-                <span className="flex items-center gap-1 text-[#E5484D]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#E5484D]" /> Weak
-                </span>
+              <textarea required value={workPrompt} onChange={(e) => setWorkPrompt(e.target.value)} placeholder="The question, in the words the class will see" rows={4} className={fieldClass} />
+              <input type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} className={fieldClass} />
+              <select value={workAudience} onChange={(e) => setWorkAudience(e.target.value as 'class' | 'group')} className={fieldClass}>
+                <option value="class">Whole class</option>
+                <option value="group">One group</option>
+              </select>
+              {workAudience === 'group' && (
+                <select required value={workGroup} onChange={(e) => setWorkGroup(e.target.value)} className={fieldClass}>
+                  <option value="">Choose a group</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>{group.name}</option>
+                  ))}
+                </select>
+              )}
+              <Button type="submit" variant="gradient">Save work</Button>
+            </form>
+          </Card>
+          <Card variant="teacher" className="space-y-3">
+            <h2 className="font-bold font-display">Set for this class</h2>
+            {work.length === 0 && <p className="text-sm text-slate-400">Nothing set yet.</p>}
+            {work.map((item) => (
+              <div key={item.id} className="p-3 rounded-xl bg-[#0C1421] border border-[#1E2D4A] text-sm">
+                <p className="font-semibold">{item.title}</p>
+                <p className="text-xs text-slate-400 mt-1">{item.kind} · {item.subject_label} · {item.audience === 'group' ? item.group_name || 'Group' : 'Whole class'}</p>
+                <p className="text-xs text-slate-300 mt-2">{item.prompt}</p>
+                <p className="text-[11px] text-slate-500 mt-2">Due {formatLongDate(item.due_at)}</p>
               </div>
-            </div>
-
-            {/* Matrix Table */}
-            <div className="space-y-3 pt-2">
-              {heatmapData?.heatmap_grid?.map((item: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] flex items-center justify-between"
-                >
-                  <div>
-                    <h3 className="text-sm font-bold text-white">{item.topic}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {item.strong} strong • {item.okay} okay • {item.weak} need help
-                    </p>
-                  </div>
-                  <HeatmapCell
-                    level={item.status as MasteryLevel}
-                    strongCount={item.strong}
-                    okayCount={item.okay}
-                    weakCount={item.weak}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-[#1E2D4A]">
-              <Button variant="outline" size="sm" className="text-slate-300 border-[#1E2D4A]">
-                <Download className="w-3.5 h-3.5 mr-1.5" /> Export Worksheet
-              </Button>
-              <Button variant="gradient" size="sm" onClick={() => setShowInterventionModal(true)}>
-                View Full Class Report
-              </Button>
-            </div>
+            ))}
           </Card>
         </div>
-      </div>
+      )}
 
-      {/* 5-Minute Intervention Modal */}
-      {showInterventionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#111E38] border border-[#1E2D4A] rounded-3xl p-6 sm:p-8 max-w-lg w-full text-white space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#1E2D4A] pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[#22D3EE]/20 text-[#22D3EE]">
-                  <Zap className="w-5 h-5" />
+      {activeTab === 'groups' && classId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card variant="teacher" className="space-y-3">
+            <h2 className="font-bold font-display">Make a group</h2>
+            <form onSubmit={handleCreateGroup} className="space-y-3">
+              <select value={groupKind} onChange={(e) => setGroupKind(e.target.value as 'custom' | 'idea')} className={fieldClass}>
+                <option value="custom">A group you choose</option>
+                <option value="idea">Learners who share one idea</option>
+              </select>
+              <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={groupKind === 'idea' ? 'Name, or leave blank to use the idea' : 'Group name'} className={fieldClass} required={groupKind === 'custom'} />
+              {groupKind === 'idea' ? (
+                <select required value={groupIdea} onChange={(e) => setGroupIdea(e.target.value)} className={fieldClass}>
+                  <option value="">Choose the idea</option>
+                  {ideas.map((idea: any) => (
+                    <option key={idea.id} value={idea.label}>{idea.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                  {students.map((student: any) => (
+                    <label key={student.id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={groupMembers.includes(student.id)} onChange={() => toggleMember(student.id)} />
+                      {student.display_name}
+                    </label>
+                  ))}
+                  {students.length === 0 && <p className="text-sm text-slate-400">This class has no learners yet.</p>}
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold font-display">5-Minute Class Intervention</h3>
-                  <p className="text-xs text-slate-400">Target: "Add tops, add bottoms" (8 students)</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowInterventionModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs leading-relaxed">
-              <div className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] space-y-2">
-                <span className="text-[11px] font-bold text-[#22D3EE] uppercase">Step 1: The Pizza Slices Hook (2 mins)</span>
-                <p className="text-slate-300">
-                  Draw two circles on the blackboard. Shade 1/2 of one circle and 1/2 of the other. Ask the class: "If I put these together, do I get 2/4 (which is half) or 2/2 (the whole thing)?"
+              )}
+              <Button type="submit" variant="gradient"><Users className="w-4 h-4 mr-1" /> Save group</Button>
+            </form>
+          </Card>
+          <Card variant="teacher" className="space-y-3">
+            <h2 className="font-bold font-display">Groups</h2>
+            {groups.length === 0 && <p className="text-sm text-slate-400">No groups yet.</p>}
+            {groups.map((group) => (
+              <div key={group.id} className="p-3 rounded-xl bg-[#0C1421] border border-[#1E2D4A] text-sm">
+                <p className="font-semibold">{group.name}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {group.kind === 'idea' ? `Idea group · ${group.idea_label}` : 'Your group'} · {group.member_count} learners
                 </p>
               </div>
-
-              <div className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] space-y-2">
-                <span className="text-[11px] font-bold text-[#0BAA7B] uppercase">Step 2: Equal Pieces Rule (2 mins)</span>
-                <p className="text-slate-300">
-                  Explain: Denominators are the sizes of the slices. You cannot combine thirds and quarters directly until both are cut into equal 12th slices.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#0C1421] border border-[#1E2D4A] space-y-2">
-                <span className="text-[11px] font-bold text-amber-400 uppercase">Step 3: Quick Check Probe (1 min)</span>
-                <p className="text-slate-300">
-                  Have students write on scrap paper: 1/5 + 1/10. Anyone writing 2/15 gets 1-on-1 fraction strip sheet.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setShowInterventionModal(false)}>
-                Close
-              </Button>
-              <Button variant="gradient" size="sm" onClick={() => { window.print(); }}>
-                Print Worksheet Activity
-              </Button>
-            </div>
-          </div>
+            ))}
+          </Card>
         </div>
+      )}
+
+      {activeTab === 'weekend' && classId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card variant="teacher" className="space-y-3">
+            <h2 className="font-bold font-display">Weekend session</h2>
+            <p className="text-sm text-slate-400">Paste the room link. WhyWrong keeps the activity and does not host the call.</p>
+            <form onSubmit={handleCreateSession} className="space-y-3">
+              <input required value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Session title" className={fieldClass} />
+              <input required type="datetime-local" value={sessionWhen} onChange={(e) => setSessionWhen(e.target.value)} className={fieldClass} />
+              <input required type="url" value={sessionUrl} onChange={(e) => setSessionUrl(e.target.value)} placeholder="https://…" className={fieldClass} />
+              <textarea required value={sessionActivity} onChange={(e) => setSessionActivity(e.target.value)} placeholder="The five-minute activity they will present" rows={4} className={fieldClass} />
+              <select value={sessionGroup} onChange={(e) => setSessionGroup(e.target.value)} className={fieldClass}>
+                <option value="">Whole class</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
+              </select>
+              <Button type="submit" variant="gradient">Save session</Button>
+            </form>
+          </Card>
+          <Card variant="teacher" className="space-y-3">
+            <h2 className="font-bold font-display">Scheduled</h2>
+            {sessions.length === 0 && <p className="text-sm text-slate-400">No session yet.</p>}
+            {sessions.map((session) => (
+              <div key={session.id} className="p-3 rounded-xl bg-[#0C1421] border border-[#1E2D4A] text-sm space-y-1">
+                <p className="font-semibold">{session.title}</p>
+                <p className="text-xs text-slate-400">{formatLongDate(session.starts_at)} · {session.group_name || 'Whole class'}</p>
+                <a href={session.call_url} className="text-xs text-[#22D3EE] break-all" target="_blank" rel="noreferrer">{session.call_url}</a>
+                <p className="text-xs text-slate-300">{session.activity}</p>
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
+
+      {!classId && !loading && activeTab !== 'dashboard' && (
+        <p className="text-sm text-slate-400 inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Create a class on the class map first.</p>
       )}
     </div>
   );

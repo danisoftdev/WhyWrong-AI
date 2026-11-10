@@ -15,64 +15,90 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 
-export const ParentPortal: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'home' | 'link' | 'digest'>('home');
-  const [linkCodeInput, setLinkCodeInput] = useState<string>('WW-8492');
-  const [consentAccepted, setConsentAccepted] = useState<boolean>(true);
+interface ParentPortalProps {
+  tab?: string;
+  onTab?: (tab: string) => void;
+}
+
+function mondayOfThisWeek(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toISOString();
+}
+
+function formatLongDate(value?: string | null): string {
+  if (!value) return 'Not scheduled';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+export const ParentPortal: React.FC<ParentPortalProps> = ({ tab = 'summary', onTab }) => {
+  const activeTab = tab === 'digest' || tab === 'link' ? tab : 'summary';
+  const [linkCodeInput, setLinkCodeInput] = useState<string>('');
+  const [consentAccepted, setConsentAccepted] = useState<boolean>(false);
   const [linkStatus, setLinkStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string>('');
 
-  useEffect(() => {
-    loadSummary();
-  }, []);
+  const go = (next: string) => onTab?.(next);
 
-  const loadSummary = async () => {
+  const loadChildren = async () => {
     try {
       setLoading(true);
-      const res = await api.getParentSummary('usr-student-01');
-      setSummaryData(res.summary);
+      setLoadError('');
+      const res = await api.getParentChildren();
+      const list = res.children || [];
+      if (list[0]) {
+        const summary = await api.getParentSummary(list[0].id);
+        setSummaryData(summary.summary);
+      } else {
+        setSummaryData(null);
+      }
     } catch {
-      // Fallback demonstration dataset
-      setSummaryData({
-        student: {
-          display_name: 'Kofi Mensah',
-          student_code: 'STU-1001',
-        },
-        week_overview: 'This week, Kofi is making steady progress in Fractions.',
-        ideas_fixed_count: 2,
-        practice_streak_days: 4,
-        next_retest_date: new Date(Date.now() + 5 * 86400000).toLocaleDateString(),
-        ideas_working_on: [
-          {
-            concept: 'Add tops, add bottoms',
-            plain_explanation: 'Learning that fractions cannot be added directly without first making the slice sizes equal.',
-          },
-        ],
-        help_at_home: {
-          title: 'Paper Fraction Strips Activity',
-          tip: 'Take two strips of scrap paper. Fold one into thirds and the other into quarters. Notice how the pieces are different sizes. Before adding them, we have to slice them into twelfths so all pieces match!',
-          duration: '5 minutes',
-        },
-        privacy_notice: 'WhyWrong never ranks children or compares scores with peers. Progress focuses on concepts mastered.',
-      });
+      setSummaryData(null);
+      setLoadError('Sign in with a parent account to see a linked child.');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadChildren();
+  }, []);
+
   const handleLinkChild = async () => {
     if (!consentAccepted) {
-      setLinkStatus({ type: 'error', message: 'You must confirm parental consent before linking.' });
+      setLinkStatus({ type: 'error', message: 'Confirm consent before linking a child.' });
       return;
     }
 
     try {
-      await api.linkChild(linkCodeInput, consentAccepted);
-      setLinkStatus({ type: 'success', message: 'Child successfully linked! Welcome to Kofi’s learning overview.' });
-      setActiveTab('home');
+      const res = await api.linkChild(linkCodeInput, consentAccepted);
+      setLinkStatus({ type: 'success', message: res.message || 'Child linked.' });
+      setLinkCodeInput('');
+      setConsentAccepted(false);
+      await loadChildren();
+      go('summary');
     } catch (e: any) {
-      setLinkStatus({ type: 'error', message: e.message || 'Invalid or expired link code.' });
+      setLinkStatus({ type: 'error', message: e.message || 'That code could not be used.' });
+    }
+  };
+
+  const handleRevoke = async () => {
+    const studentId = summaryData?.student?.id;
+    if (!studentId) return;
+    try {
+      await api.revokeChild(studentId);
+      setSummaryData(null);
+      setLinkStatus({ type: 'success', message: 'The link is removed. Weekly notes for this child have stopped.' });
+      go('link');
+    } catch (e: any) {
+      setLinkStatus({ type: 'error', message: e.message || 'The link could not be removed.' });
     }
   };
 
@@ -92,9 +118,9 @@ export const ParentPortal: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab('home')}
+            onClick={() => go('summary')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'home'
+              activeTab === 'summary'
                 ? 'bg-[#734DFD] text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
@@ -103,7 +129,7 @@ export const ParentPortal: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('digest')}
+            onClick={() => go('digest')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'digest'
                 ? 'bg-[#734DFD] text-white shadow-sm'
@@ -114,7 +140,7 @@ export const ParentPortal: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('link')}
+            onClick={() => go('link')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'link'
                 ? 'bg-[#734DFD] text-white shadow-sm'
@@ -129,17 +155,31 @@ export const ParentPortal: React.FC = () => {
       {/* ───────────────────────────────────────────────────────── */}
       {/* SCREEN 14: Parent Home */}
       {/* ───────────────────────────────────────────────────────── */}
-      {activeTab === 'home' && summaryData && (
+      {activeTab === 'summary' && loading && (
+        <p className="text-sm text-slate-500">Loading your child…</p>
+      )}
+
+      {activeTab === 'summary' && !loading && !summaryData && (
+        <Card variant="student" className="space-y-3">
+          <h2 className="text-lg font-bold font-display text-slate-900">No child linked yet</h2>
+          <p className="text-sm text-slate-600">
+            {loadError || 'Enter the one-time code from the teacher. You will only see accepted ideas for that child.'}
+          </p>
+          <Button variant="gradient" onClick={() => go('link')}>Link a child</Button>
+        </Card>
+      )}
+
+      {activeTab === 'summary' && summaryData && (
         <div className="space-y-6">
           {/* Child Switcher Pill */}
           <div className="p-4 rounded-2xl bg-[#F3F5FD] border border-slate-200/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-[#734DFD] text-white flex items-center justify-center font-bold text-sm">
-                K
+                {(summaryData.student.display_name || '?').charAt(0)}
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-900">{summaryData.student.display_name}</p>
-                <p className="text-[10px] text-slate-500 font-mono">Code: {summaryData.student.student_code} • Class 2A</p>
+                <p className="text-[10px] text-slate-500 font-mono">Code: {summaryData.student.student_code}</p>
               </div>
             </div>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#0BAA7B]/10 text-[#0BAA7B]">
@@ -156,7 +196,7 @@ export const ParentPortal: React.FC = () => {
               {summaryData.week_overview}
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              We look past marks to find the exact rules children use when solving problems. Rather than saying an answer is just "wrong", we help Kofi understand why adding fractions requires identical slice sizes.
+              This page shows the idea a teacher has accepted for {summaryData.student.display_name}. Marks, class rank, and unaccepted cases stay off it.
             </p>
           </Card>
 
@@ -170,6 +210,7 @@ export const ParentPortal: React.FC = () => {
               <p className="text-[11px] text-slate-400 mt-1">Mastered through remediation</p>
             </div>
 
+            {summaryData.practice_streak_days > 0 && (
             <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
               <span className="text-xs font-medium text-slate-500">Practice Streak</span>
               <p className="text-2xl font-black font-display text-[#734DFD] mt-1">
@@ -177,11 +218,12 @@ export const ParentPortal: React.FC = () => {
               </p>
               <p className="text-[11px] text-slate-400 mt-1">Active engagement</p>
             </div>
+            )}
 
             <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
               <span className="text-xs font-medium text-slate-500">Next Retest Due</span>
               <p className="text-2xl font-black font-display text-slate-900 mt-1">
-                {summaryData.next_retest_date}
+                {formatLongDate(summaryData.next_retest_date)}
               </p>
               <p className="text-[11px] text-slate-400 mt-1">7-day retention check</p>
             </div>
@@ -192,7 +234,7 @@ export const ParentPortal: React.FC = () => {
             <div className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wider">
               <Lightbulb className="w-4 h-4 text-amber-600" /> {summaryData.help_at_home.title} ({summaryData.help_at_home.duration})
             </div>
-            <h3 className="font-bold text-sm text-slate-900">How you can help Kofi at home:</h3>
+            <h3 className="font-bold text-sm text-slate-900">How you can help {summaryData.student.display_name} at home</h3>
             <p className="text-xs text-slate-700 leading-relaxed">
               {summaryData.help_at_home.tip}
             </p>
@@ -203,6 +245,8 @@ export const ParentPortal: React.FC = () => {
             <Shield className="w-4 h-4 text-slate-400 shrink-0" />
             <span>{summaryData.privacy_notice}</span>
           </div>
+
+          <Button variant="outline" onClick={handleRevoke}>Remove this link</Button>
         </div>
       )}
 
@@ -272,6 +316,12 @@ export const ParentPortal: React.FC = () => {
       {/* ───────────────────────────────────────────────────────── */}
       {/* SCREEN 16: Weekly Digest and Printable Summary */}
       {/* ───────────────────────────────────────────────────────── */}
+      {activeTab === 'digest' && !summaryData && (
+        <Card variant="student">
+          <p className="text-sm text-slate-600">A weekly note appears after a child is linked and a teacher has accepted an idea.</p>
+        </Card>
+      )}
+
       {activeTab === 'digest' && summaryData && (
         <div className="space-y-6">
           <div className="flex justify-between items-center no-print">
@@ -299,15 +349,18 @@ export const ParentPortal: React.FC = () => {
                 </div>
               </div>
               <div className="text-right text-xs text-slate-400">
-                <p>Week of {new Date().toLocaleDateString()}</p>
+                <p>Week of {formatLongDate(mondayOfThisWeek())}</p>
                 <p className="text-[10px] text-[#0BAA7B] font-bold">WhyWrong Diagnostic Report</p>
               </div>
             </div>
 
             <div className="space-y-4">
               <h3 className="font-bold text-sm text-slate-900 font-display">
-                What Kofi is Working On This Week:
+                What {summaryData.student.display_name} is working on
               </h3>
+              {summaryData.ideas_working_on.length === 0 && (
+                <p className="text-xs text-slate-600">No accepted idea yet.</p>
+              )}
               {summaryData.ideas_working_on.map((idea: any, i: number) => (
                 <div key={i} className="p-4 rounded-xl bg-[#F3F5FD] border border-slate-200/60 text-xs">
                   <p className="font-bold text-slate-800">{idea.concept}</p>
@@ -319,11 +372,11 @@ export const ParentPortal: React.FC = () => {
             <div className="grid sm:grid-cols-2 gap-4 pt-2">
               <div className="p-4 rounded-xl border border-slate-200">
                 <span className="text-xs text-slate-400 uppercase font-bold">Ideas Fixed</span>
-                <p className="text-xl font-black text-[#0BAA7B] mt-1">{summaryData.ideas_fixed_count} breakthrough</p>
+                <p className="text-xl font-black text-[#0BAA7B] mt-1">{summaryData.ideas_fixed_count}</p>
               </div>
               <div className="p-4 rounded-xl border border-slate-200">
                 <span className="text-xs text-slate-400 uppercase font-bold">Next Retention Check</span>
-                <p className="text-xl font-black text-[#734DFD] mt-1">{summaryData.next_retest_date}</p>
+                <p className="text-xl font-black text-[#734DFD] mt-1">{formatLongDate(summaryData.next_retest_date)}</p>
               </div>
             </div>
 

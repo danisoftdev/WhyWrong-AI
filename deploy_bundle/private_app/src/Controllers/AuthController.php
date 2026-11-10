@@ -165,23 +165,40 @@ class AuthController
         $password = (string)$request->get('password', '');
         $displayName = trim((string)$request->get('display_name', ''));
 
-        if (!in_array($role, ['parent', 'teacher'], true)) {
-            $response->error('Role must be parent or teacher.', 'VALIDATION_ERROR', 422);
-            return;
-        }
-
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $response->error('Valid email address is required.', 'VALIDATION_ERROR', 422);
-            return;
-        }
-
-        if (strlen($password) < 8) {
-            $response->error('Password must be at least 8 characters.', 'VALIDATION_ERROR', 422);
+        if (!in_array($role, ['parent', 'student'], true)) {
+            $response->error('Open registration is for a parent account. School staff are added by an administrator.', 'FORBIDDEN', 403);
             return;
         }
 
         if ($displayName === '') {
             $response->error('Display name is required.', 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        $minPassLen = ($role === 'student') ? 4 : 8;
+        if (strlen($password) < $minPassLen) {
+            $response->error("Password must be at least {$minPassLen} characters.", 'VALIDATION_ERROR', 422);
+            return;
+        }
+
+        $studentCode = null;
+        if ($role === 'student') {
+            $lastStudent = $this->db->fetchOne("SELECT student_code FROM users WHERE role = 'student' AND student_code LIKE 'STU-%' ORDER BY student_code DESC LIMIT 1");
+            $nextNum = 1005;
+            if ($lastStudent && preg_match('/STU-(\d+)/', $lastStudent['student_code'], $m)) {
+                $nextNum = max($nextNum, ((int)$m[1]) + 1);
+            }
+            do {
+                $studentCode = 'STU-' . random_int(2000, 99999);
+            } while ($this->db->fetchOne("SELECT id FROM users WHERE student_code = ?", [$studentCode]));
+
+            if ($email === '') {
+                $email = strtolower($studentCode) . '@student.whywrong.ai';
+            }
+        }
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $response->error('Valid email address is required.', 'VALIDATION_ERROR', 422);
             return;
         }
 
@@ -196,13 +213,16 @@ class AuthController
         $hash = password_hash($password, PASSWORD_BCRYPT);
 
         // Fetch demo school if exists
-        $school = $this->db->fetchOne("SELECT id FROM schools LIMIT 1");
-        $schoolId = $school['id'] ?? null;
+        $schoolId = null;
+        try {
+            $school = $this->db->fetchOne("SELECT id FROM schools LIMIT 1");
+            $schoolId = $school['id'] ?? null;
+        } catch (\Throwable $e) {}
 
         $this->db->execute(
-            "INSERT INTO users (id, email, password_hash, display_name, role, school_id, is_demo, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, 1, NOW())",
-            [$userId, $email, $hash, $displayName, $role, $schoolId]
+            "INSERT INTO users (id, email, password_hash, display_name, role, student_code, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())",
+            [$userId, $email, $hash, $displayName, $role, $studentCode]
         );
 
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -213,6 +233,14 @@ class AuthController
         $_SESSION['role'] = $role;
         $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
 
+        try {
+            $this->db->execute(
+                "INSERT INTO consents (id, user_id, subject_student_id, consent_type, version, granted_at)
+                 VALUES (?, ?, NULL, 'terms', '1.0', NOW())",
+                ['cns-' . bin2hex(random_bytes(8)), $userId]
+            );
+        } catch (\Throwable $e) {}
+
         $response->json([
             'status' => 'success',
             'user' => [
@@ -220,7 +248,8 @@ class AuthController
                 'role'         => $role,
                 'display_name' => $displayName,
                 'email'        => $email,
-                'is_demo'      => true,
+                'student_code' => $studentCode,
+                'is_demo'      => false,
             ],
             'csrf_token' => $_SESSION['csrf_token'],
             'message' => 'Account successfully registered and signed in.',

@@ -74,6 +74,8 @@ class Application
 
         // Attempts
         $r->post('/api/attempts',          'AttemptController@store',       roles: ['student']);
+        $r->get('/api/student/work',       'StudentWorkController@list',    roles: ['student']);
+        $r->post('/api/student/work/{id}/responses', 'StudentWorkController@respond', roles: ['student']);
 
         // Diagnoses
         $r->post('/api/diagnoses',         'DiagnosisController@store',      roles: ['student']);
@@ -92,6 +94,12 @@ class Application
         $r->post('/api/classes',           'ClassController@store',         roles: ['teacher']);
         $r->get('/api/classes/{id}/heatmap', 'ClassController@heatmap',     roles: ['teacher']);
         $r->post('/api/classes/{id}/roster', 'ClassController@roster',      roles: ['teacher']);
+        $r->get('/api/classes/{id}/groups',  'ClassroomController@groups',  roles: ['teacher']);
+        $r->post('/api/classes/{id}/groups', 'ClassroomController@createGroup', roles: ['teacher']);
+        $r->get('/api/classes/{id}/assignments', 'ClassroomController@assignments', roles: ['teacher']);
+        $r->post('/api/classes/{id}/assignments', 'ClassroomController@createAssignment', roles: ['teacher']);
+        $r->get('/api/classes/{id}/sessions', 'ClassroomController@sessions', roles: ['teacher']);
+        $r->post('/api/classes/{id}/sessions', 'ClassroomController@createSession', roles: ['teacher']);
 
         // Students & Link Codes
         $r->post('/api/students/{id}/link-codes', 'LinkCodeController@generate',   roles: ['teacher']);

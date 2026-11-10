@@ -14,29 +14,57 @@ import {
   RotateCcw,
   CheckCircle2,
   Calendar,
-  Image as ImageIcon,
-  HelpCircle,
   Award,
 } from 'lucide-react';
 import type { Diagnosis } from '../../types';
 import { api } from '../../services/api';
 import { SUBJECT_QUIZ_CONFIGS, type SubjectQuizConfig } from './subjectQuestions';
 
+export interface AssignedWork {
+  id: string;
+  title: string;
+  subject_label: string;
+  prompt: string;
+  kind?: string;
+  due_at?: string | null;
+}
+
 interface QuizFlowProps {
   subjectSlug?: string;
+  learnerName?: string;
+  assignment?: AssignedWork | null;
   onFinish?: () => void;
 }
 
-export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics', onFinish }) => {
+function quoteFromAnswer(answer: string): string {
+  const text = answer.trim();
+  if (text.length <= 120) return text;
+  return text.slice(0, 120);
+}
+
+function laterCheckLabel(): string {
+  return new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+export const QuizFlow: React.FC<QuizFlowProps> = ({
+  subjectSlug = 'mathematics',
+  learnerName = 'You',
+  assignment = null,
+  onFinish,
+}) => {
   const config: SubjectQuizConfig =
     SUBJECT_QUIZ_CONFIGS[subjectSlug] || SUBJECT_QUIZ_CONFIGS['mathematics'];
 
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [selectedOption, setSelectedOption] = useState<string>(config.question.defaultOptionId);
-  const [workingText, setWorkingText] = useState<string>(config.question.defaultWorking);
+  const [selectedOption, setSelectedOption] = useState<string>('');
+  const [workingText, setWorkingText] = useState<string>('');
   const [confidence, setConfidence] = useState<'sure' | 'unsure' | 'guessing'>('sure');
   const [isCorrectPath, setIsCorrectPath] = useState<boolean>(false);
-  const [hasSubmitted, setHasSubmitted] = useState<boolean>(true);
+  const [hasSubmitted, setHasSubmitted] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Diagnosis State
@@ -44,7 +72,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
     id: `diag-demo-${config.slug}-01`,
     attempt_id: `att-demo-${config.slug}-01`,
     state: 'suspected',
-    evidence_quote: config.diagnosis.evidenceQuote,
+    evidence_quote: '',
     evidence_strength: 'moderate',
     provider: 'rules_engine',
     is_demo: false,
@@ -52,7 +80,9 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   });
 
   // Probe State
-  const [selectedProbeOption, setSelectedProbeOption] = useState<string>(config.probe.defaultProbeId);
+  const [selectedProbeOption, setSelectedProbeOption] = useState<string>('');
+  const [practicePicks, setPracticePicks] = useState<Record<number, string>>({});
+  const [ownWords, setOwnWords] = useState('');
   const [probeResult, setProbeResult] = useState<string>('confirms');
 
   // Remediation State
@@ -63,7 +93,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   // Draft preservation across session expiry / page reload
   useEffect(() => {
     try {
-      const draft = localStorage.getItem(`ww_quiz_draft_${subjectSlug}`);
+      const draft = localStorage.getItem(`ww_quiz_draft_v2_${subjectSlug}`);
       if (draft) {
         const parsed = JSON.parse(draft);
         if (parsed.selectedOption) setSelectedOption(parsed.selectedOption);
@@ -76,7 +106,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   useEffect(() => {
     try {
       localStorage.setItem(
-        `ww_quiz_draft_${subjectSlug}`,
+        `ww_quiz_draft_v2_${subjectSlug}`,
         JSON.stringify({ selectedOption, workingText, confidence })
       );
     } catch {}
@@ -85,27 +115,31 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   // Reset state when subject changes
   useEffect(() => {
     const active = SUBJECT_QUIZ_CONFIGS[subjectSlug] || SUBJECT_QUIZ_CONFIGS['mathematics'];
-    setSelectedOption(active.question.defaultOptionId);
-    setWorkingText(active.question.defaultWorking);
+    setSelectedOption('');
+    setWorkingText(assignment?.prompt ? '' : '');
     setConfidence('sure');
     setIsCorrectPath(false);
     setDiagnosis({
       id: `diag-demo-${active.slug}-01`,
       attempt_id: `att-demo-${active.slug}-01`,
       state: 'suspected',
-      evidence_quote: active.diagnosis.evidenceQuote,
-      evidence_strength: 'moderate',
+      evidence_quote: '',
+      evidence_strength: 'low',
       provider: 'rules_engine',
       is_demo: false,
-      misconception: active.diagnosis.misconception,
+      misconception: assignment
+        ? { id: 'unverified', label: 'Not decided yet', explanation: 'One answer is only a suspected idea. A teacher decides before anyone else sees it.' }
+        : active.diagnosis.misconception,
     });
-    setSelectedProbeOption(active.probe.defaultProbeId);
+    setSelectedProbeOption('');
+    setPracticePicks({});
+    setOwnWords('');
     setCurrentStep(1);
-    setHasSubmitted(true);
+    setHasSubmitted(false);
     setRetestScheduled(false);
     setActiveRemediationTab('learn');
     setIsPlayingStrip(false);
-  }, [subjectSlug]);
+  }, [subjectSlug, assignment?.id]);
 
   const steps: StepItem[] = [
     { id: 1, label: 'Answer Question', description: config.stepDescription },
@@ -116,21 +150,49 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   ];
 
   const handleInitialSubmit = async () => {
+    const chosen = config.question.options.find((option) => option.id === selectedOption);
+    const answerText = assignment ? workingText.trim() : (workingText.trim() || chosen?.text || '');
+    if (!answerText || (!assignment && !selectedOption)) return;
+    const quote = quoteFromAnswer(answerText);
+    const suspected = {
+      id: assignment ? `diag-${assignment.id}` : `diag-demo-${config.slug}-01`,
+      attempt_id: assignment ? assignment.id : `att-demo-${config.slug}-01`,
+      state: 'suspected' as const,
+      evidence_quote: quote,
+      evidence_strength: 'low' as const,
+      provider: 'rules_engine',
+      is_demo: false,
+      misconception: assignment
+        ? { id: 'unverified', label: 'Not decided yet', explanation: 'One answer is only a suspected idea. A teacher decides before anyone else sees it.' }
+        : config.diagnosis.misconception,
+    };
     setLoading(true);
+    setHasSubmitted(true);
     try {
+      if (assignment) {
+        await api.submitWorkResponse(assignment.id, answerText, quote);
+        setDiagnosis(suspected);
+        setCurrentStep(2);
+        return;
+      }
       const res = await api.submitAttempt(`q-${config.slug}-01`, selectedOption, workingText, confidence);
       if (res.is_correct) {
         setIsCorrectPath(true);
-        setHasSubmitted(true);
         setCurrentStep(5);
         return;
       }
       const diagRes = await api.getDiagnosis(res.attempt_id);
-      setDiagnosis(diagRes);
-      setHasSubmitted(true);
+      const serverQuote = diagRes.evidence_quote || '';
+      setDiagnosis({
+        ...suspected,
+        ...diagRes,
+        state: 'suspected',
+        evidence_quote: answerText.includes(serverQuote) && serverQuote ? serverQuote : quote,
+        evidence_strength: diagRes.evidence_strength || 'low',
+      });
       setCurrentStep(2);
     } catch {
-      setHasSubmitted(true);
+      setDiagnosis(suspected);
       setCurrentStep(2);
     } finally {
       setLoading(false);
@@ -138,22 +200,40 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
   };
 
   const handleProbeSubmit = async () => {
+    if (!selectedProbeOption) return;
     setLoading(true);
-    try {
-      const res = await api.submitProbeResponse(`prb-${config.slug}-01`, selectedProbeOption, 'response');
-      if (res.diagnosis_state === 'rejected' || (res as any).is_slip) {
+    const note = assignment
+      ? selectedProbeOption
+      : config.probe.options.find((option) => option.id === selectedProbeOption)?.note;
+    const local = () => {
+      if (note === 'Correct' || note === 'slip') {
         setProbeResult('slip');
-        setDiagnosis(prev => ({
-          ...prev,
-          state: 'rejected',
-          evidence_strength: 'low',
-        }));
-      } else {
+        setDiagnosis((prev) => ({ ...prev, state: 'rejected', evidence_strength: 'low' }));
+      } else if (note === 'Predicted wrong rule' || note === 'rule') {
         setProbeResult('confirms');
-        setDiagnosis(prev => ({ ...prev, evidence_strength: 'strong' }));
+        setDiagnosis((prev) => ({ ...prev, state: 'suspected', evidence_strength: 'strong' }));
+      } else {
+        setProbeResult('unsure');
+        setDiagnosis((prev) => ({ ...prev, state: 'suspected', evidence_strength: 'moderate' }));
       }
+    };
+    try {
+      if (assignment) {
+        local();
+        setCurrentStep(4);
+        return;
+      }
+      const res = await api.submitProbeResponse(`prb-${config.slug}-01`, selectedProbeOption, 'response');
+      const slipped = res.diagnosis_state === 'rejected' || (res as any).is_slip;
+      setProbeResult(slipped ? 'slip' : 'confirms');
+      setDiagnosis((prev) => ({
+        ...prev,
+        state: slipped ? 'rejected' : 'suspected',
+        evidence_strength: slipped ? 'low' : (res.evidence_strength === 'strong' ? 'strong' : 'moderate'),
+      }));
       setCurrentStep(4);
     } catch {
+      local();
       setCurrentStep(4);
     } finally {
       setLoading(false);
@@ -209,7 +289,9 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
           <Stepper
             steps={steps}
             currentStep={currentStep}
-            onStepClick={(id) => setCurrentStep(id)}
+            onStepClick={(id) => {
+              if (id <= currentStep) setCurrentStep(id);
+            }}
           />
           <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
             <span>Subject: <strong className="text-slate-700 capitalize">{config.slug}</strong></span>
@@ -227,21 +309,21 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Question 1 of 5</span>
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  Multiple Choice
+                  {assignment ? (assignment.kind === 'worksheet' ? 'Worksheet' : 'Assigned question') : 'Multiple Choice'}
                 </span>
               </div>
 
               {/* Dynamic Question Presentation */}
               <div className="p-8 rounded-2xl bg-[#F3F5FD] border border-slate-200/80 text-center space-y-3">
                 <p className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
-                  {config.question.prompt}
+                  {assignment ? assignment.prompt : config.question.prompt}
                 </p>
-                {config.question.promptMath && (
+                {!assignment && config.question.promptMath && (
                   <h3 className="text-2xl sm:text-3xl font-bold font-display text-slate-900 tracking-wide mt-2">
                     <StackedFraction math={config.question.promptMath} />
                   </h3>
                 )}
-                {config.question.isCode && (
+                {!assignment && config.question.isCode && (
                   <pre className="bg-[#0B1020] text-emerald-400 p-4 rounded-xl font-mono text-xs sm:text-sm text-left max-w-md mx-auto overflow-x-auto border border-slate-800">
                     <code>{config.question.prompt}</code>
                   </pre>
@@ -249,6 +331,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               </div>
 
               {/* Options A to D */}
+              {!assignment && (
               <div className="grid sm:grid-cols-2 gap-3.5">
                 {config.question.options.map((opt) => (
                   <OptionButton
@@ -261,6 +344,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                   />
                 ))}
               </div>
+              )}
 
               {/* Written Working Box */}
               <div className="space-y-2 pt-2">
@@ -268,21 +352,16 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                   <label htmlFor="working" className="text-xs font-bold text-slate-700">
                     Your Working (Optional — helps AI find your thinking rule):
                   </label>
-                  <button
-                    type="button"
-                    disabled
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 cursor-not-allowed"
-                    title="Camera handwriting analysis available in mobile app"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5" /> Add Image (Camera)
-                  </button>
+                  <span className="text-[11px] text-slate-400">
+                    {assignment ? assignment.subject_label : 'Optional'}
+                  </span>
                 </div>
                 <textarea
                   id="working"
                   rows={2}
                   value={workingText}
                   onChange={(e) => setWorkingText(e.target.value)}
-                  placeholder="Explain your reasoning here..."
+                  placeholder={assignment ? 'Write the answer in your own words' : 'Explain your reasoning here...'}
                   className="w-full text-xs font-mono p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#734DFD]"
                 />
               </div>
@@ -336,7 +415,13 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               />
 
               <div className="flex justify-end pt-2">
-                <Button variant="gradient" size="lg" className="min-h-[44px]" onClick={handleInitialSubmit}>
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  className="min-h-[44px]"
+                  disabled={loading || (assignment ? workingText.trim() === '' : selectedOption === '')}
+                  onClick={handleInitialSubmit}
+                >
                   Submit Answer & Analyze <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -353,10 +438,10 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-base font-bold text-[#E5484D] font-display flex items-center gap-2">
-                      Incorrect Answer. But that’s okay! Let’s find out why.
+                      {assignment ? 'Answer saved. The idea is still suspected.' : 'Wrong answer. The idea is still suspected.'}
                     </h3>
                     <p className="text-xs text-slate-600 mt-1">
-                      You chose option <span className="font-bold text-slate-900">{config.question.options.find(o => o.id === selectedOption)?.label || 'B'}</span>. A mistake is just an opportunity to fix the underlying thinking rule.
+                      Evidence is {diagnosis.evidence_strength}. One answer is not a confirmed idea.
                     </p>
                   </div>
                 </div>
@@ -371,7 +456,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                     Detected Misconception
                   </span>
                   <span className="text-xs font-medium text-slate-400">
-                    Status: <span className="text-[#F48B2C] font-bold">Tentative Hypothesis</span>
+                    Status: <span className="text-[#F48B2C] font-bold capitalize">{diagnosis.state} · {diagnosis.evidence_strength}</span>
                   </span>
                 </div>
 
@@ -416,7 +501,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
 
               <Mascot
                 mood="encouraging"
-                speech="Don't worry, Kofi! Let's answer a quick probe question to confirm whether this is really your thinking pattern."
+                speech="One answer only suspects an idea. A short probe checks whether it was that idea or a slip."
               />
 
               <div className="flex justify-between items-center pt-2">
@@ -457,17 +542,24 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               <div className="p-6 rounded-2xl bg-[#F3F5FD] border border-slate-200/80 text-center space-y-2">
                 <p className="text-xs text-slate-500 font-medium">Diagnostic Check:</p>
                 <h4 className="text-base sm:text-lg font-bold font-display text-slate-900">
-                  {config.probe.prompt.includes('\\frac') ? (
-                    <StackedFraction math={config.probe.prompt} />
-                  ) : (
-                    config.probe.prompt
-                  )}
+                  {assignment
+                    ? 'Was this the rule you meant, or a slip?'
+                    : config.probe.prompt.includes('\\frac')
+                      ? <StackedFraction math={config.probe.prompt} />
+                      : config.probe.prompt}
                 </h4>
               </div>
 
               {/* Probe Options */}
               <div className="grid sm:grid-cols-2 gap-3.5">
-                {config.probe.options.map((opt) => (
+                {(assignment
+                  ? [
+                      { id: 'rule', label: 'A', text: 'I used a rule I can explain' },
+                      { id: 'slip', label: 'B', text: 'It was a slip' },
+                      { id: 'unsure', label: 'C', text: "I'm not sure" },
+                    ]
+                  : config.probe.options
+                ).map((opt) => (
                   <OptionButton
                     key={opt.id}
                     label={opt.label}
@@ -476,25 +568,13 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                     onClick={() => setSelectedProbeOption(opt.id)}
                   />
                 ))}
-                <OptionButton
-                  key="opt-probe-unsure"
-                  label="?"
-                  text="I'm not sure / need help"
-                  isSelected={selectedProbeOption === 'opt-probe-unsure'}
-                  onClick={() => setSelectedProbeOption('opt-probe-unsure')}
-                />
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-500 flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-[#734DFD] shrink-0" />
-                <span>If you pick the predicted misconception answer, evidence strength will increase from Moderate to Strong.</span>
               </div>
 
               <div className="flex justify-between items-center pt-2">
                 <Button variant="outline" className="min-h-[44px]" onClick={() => setCurrentStep(2)}>
                   Back to Diagnosis
                 </Button>
-                <Button variant="gradient" size="lg" className="min-h-[44px]" onClick={handleProbeSubmit}>
+                <Button variant="gradient" size="lg" className="min-h-[44px]" disabled={!selectedProbeOption || loading} onClick={handleProbeSubmit}>
                   Submit Probe & See Remediation <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -531,10 +611,10 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-[#0BAA7B] font-display">
-                        Misconception Confirmed with Strong Evidence
+                        Still suspected. Evidence is {diagnosis.evidence_strength}.
                       </h4>
                       <p className="text-xs text-slate-600 mt-0.5">
-                        Your probe responses matched the predicted pattern. Now let's fix the rule!
+                        A teacher accepts, edits, or rejects this before it is treated as decided.
                       </p>
                     </div>
                   </div>
@@ -542,7 +622,16 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                 </div>
               )}
 
+              {assignment && (
+                <Card variant="student" className="space-y-3">
+                  <h3 className="font-bold font-display">Practice in your own words</h3>
+                  <p className="text-sm text-slate-600">Explain the idea without copying the question. This stays with your case.</p>
+                  <textarea value={ownWords} onChange={(e) => setOwnWords(e.target.value)} rows={3} className="w-full text-sm p-3 rounded-xl border border-slate-200" placeholder="The idea, in your own words" />
+                </Card>
+              )}
+
               {/* Tabbed Remediation Card */}
+              {!assignment && (
               <Card variant="student" className="p-6 space-y-6">
                 {/* 4 Tabs from Reference Mockup */}
                 <div className="flex flex-wrap gap-2 p-1.5 bg-[#F3F5FD] rounded-2xl border border-slate-200/60">
@@ -749,15 +838,28 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                     </div>
 
                     {config.remediation.practice.map((item, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-[#F3F5FD] border border-slate-200/80 flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase text-slate-400">Practice Item {idx + 1}</span>
-                          <p className="text-sm font-bold text-slate-900 mt-0.5">{item.prompt}</p>
-                          <span className="text-[11px] text-[#0BAA7B] font-semibold">Answer: {item.correct}</span>
+                      <div key={idx} className="p-4 rounded-2xl bg-[#F3F5FD] border border-slate-200/80 space-y-2">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Practice item {idx + 1}</span>
+                        <p className="text-sm font-bold text-slate-900">{item.prompt}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {item.options.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => setPracticePicks((current) => ({ ...current, [idx]: option }))}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border ${
+                                practicePicks[idx] === option ? 'border-[#734DFD] bg-[#734DFD]/10 text-[#734DFD]' : 'border-slate-200 bg-white'
+                              }`}
+                            >
+                              {option}
+                            </button>
+                          ))}
                         </div>
-                        <Button variant="outline" size="sm">
-                          Completed
-                        </Button>
+                        {practicePicks[idx] && (
+                          <p className={`text-xs font-semibold ${practicePicks[idx] === item.correct ? 'text-[#0BAA7B]' : 'text-[#E5484D]'}`}>
+                            {practicePicks[idx] === item.correct ? 'That matches the corrected rule.' : `The corrected rule gives ${item.correct}.`}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -775,6 +877,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                   </div>
                 )}
               </Card>
+              )}
 
               {/* Schedule Retest Section */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -819,7 +922,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
               <div className="p-4 rounded-2xl bg-[#F3F5FD] max-w-sm mx-auto text-left space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Student:</span>
-                  <span className="font-bold text-slate-900">Kofi Mensah (STU-1001)</span>
+                  <span className="font-bold text-slate-900">{learnerName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Subject / Concept:</span>
@@ -827,11 +930,11 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({ subjectSlug = 'mathematics',
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Evidence Status:</span>
-                  <span className="font-bold text-[#0BAA7B]">Probe Confirmed & Remediation Provided</span>
+                  <span className="font-bold text-[#734DFD] capitalize">{diagnosis.state} · {diagnosis.evidence_strength}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Next Retest Date:</span>
-                  <span className="font-bold text-[#734DFD]">{new Date(Date.now() + 7 * 86400000).toLocaleDateString()}</span>
+                  <span className="font-bold text-[#734DFD]">{laterCheckLabel()}</span>
                 </div>
               </div>
 

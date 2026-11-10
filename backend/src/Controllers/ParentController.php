@@ -45,7 +45,7 @@ class ParentController
             }
         }
 
-        if (!$matchedCode) {
+        if (!$matchedCode || (int)($matchedCode['attempts'] ?? 0) >= 5) {
             $response->error('Invalid or expired link code. Please check with your child’s teacher.', 'NOT_FOUND', 404);
             return;
         }
@@ -70,8 +70,8 @@ class ParentController
         try {
             $this->db->execute(
                 "INSERT INTO consents (id, user_id, subject_student_id, consent_type, version, granted_at)
-                 VALUES (UUID(), ?, ?, 'parent_access', '1.0', NOW())",
-                [$parentId, $studentId]
+                 VALUES (?, ?, ?, 'parent_access', '1.0', NOW())",
+                ['cns-' . bin2hex(random_bytes(8)), $parentId, $studentId]
             );
         } catch (\Throwable $e) {}
 
@@ -156,43 +156,111 @@ class ParentController
             [$studentId]
         );
 
-        // Rule: Only teacher-accepted (confirmed) diagnoses. Never raw answers, never unreviewed or rejected.
-        $acceptedDiagnoses = $this->db->fetchAll(
-            "SELECT d.id, m.label as misconception_label, m.explanation, d.created_at
-             FROM diagnoses d
-             JOIN attempts a ON d.attempt_id = a.id
-             JOIN misconceptions m ON d.misconception_id = m.id
-             WHERE a.student_id = ? AND d.state = 'confirmed'
-             ORDER BY d.created_at DESC",
-            [$studentId]
-        );
+        $name = (string)($student['display_name'] ?? 'Your child');
+        $accepted = [];
+        try {
+            $accepted = $this->db->fetchAll(
+                "SELECT d.id, m.label AS misconception_label, t.name AS topic_name
+                 FROM diagnoses d
+                 JOIN attempts a ON d.attempt_id = a.id
+                 LEFT JOIN misconceptions m ON d.misconception_id = m.id
+                 LEFT JOIN topics t ON m.topic_id = t.id
+                 WHERE a.student_id = ? AND d.state = 'confirmed'
+                   AND NOT EXISTS (
+                     SELECT 1 FROM teacher_reviews tr
+                     WHERE tr.diagnosis_id = d.id AND tr.decision = 'rejected'
+                   )
+                 ORDER BY d.created_at DESC",
+                [$studentId]
+            );
+        } catch (\Throwable $e) {
+            $accepted = [];
+        }
 
         $ideasWorkingOn = [];
-        foreach ($acceptedDiagnoses as $d) {
+        foreach ($accepted as $row) {
+            $label = trim((string)($row['misconception_label'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $topic = trim((string)($row['topic_name'] ?? 'this subject'));
             $ideasWorkingOn[] = [
-                'concept' => $d['misconception_label'],
-                'plain_explanation' => "Working on adding fractions with different parts.",
+                'concept' => $label,
+                'plain_explanation' => "{$name} is working on one idea about {$topic}.",
             ];
         }
 
-        // Digest data
+        $nextRetest = null;
+        try {
+            $due = $this->db->fetchOne(
+                "SELECT due_at FROM retests WHERE student_id = ? AND status = 'scheduled' ORDER BY due_at ASC LIMIT 1",
+                [$studentId]
+            );
+            $nextRetest = $due['due_at'] ?? null;
+        } catch (\Throwable $e) {}
+
+        $fixedCount = 0;
+        try {
+            $fixed = $this->db->fetchOne(
+                "SELECT COUNT(*) AS cnt FROM retests WHERE student_id = ? AND status = 'completed'",
+                [$studentId]
+            );
+            $fixedCount = (int)($fixed['cnt'] ?? 0);
+        } catch (\Throwable $e) {}
+
+        if ($ideasWorkingOn === []) {
+            $overview = "There is no accepted idea to share for {$name} yet.";
+            $home = [
+                'title' => 'Nothing to practise yet',
+                'tip' => 'When the teacher accepts an idea, a short home activity will appear here.',
+                'duration' => '',
+            ];
+        } else {
+            $first = $ideasWorkingOn[0];
+            $overview = $first['plain_explanation'];
+            $home = [
+                'title' => 'Five minutes at home',
+                'tip' => "Ask {$name} to explain “{$first['concept']}” in their own words, then try one fresh example together.",
+                'duration' => '5 minutes',
+            ];
+        }
+
         $summaryData = [
             'student' => [
-                'display_name' => $student['display_name'],
-                'student_code' => $student['student_code'],
+                'id' => $student['id'],
+                'display_name' => $name,
+                'student_code' => $student['student_code'] ?? '',
             ],
-            'week_overview' => "This week, {$student['display_name']} is making steady progress in Fractions.",
-            'ideas_fixed_count' => 2,
-            'practice_streak_days' => 4,
-            'next_retest_date' => date('Y-m-d', strtotime('+5 days')),
+            'week_overview' => $overview,
+            'ideas_fixed_count' => $fixedCount,
+            'practice_streak_days' => 0,
+            'next_retest_date' => $nextRetest,
             'ideas_working_on' => $ideasWorkingOn,
-            'help_at_home' => [
-                'title' => 'Paper Fraction Strips Activity',
-                'tip' => 'Take two strips of scrap paper. Fold one into thirds and the other into quarters. Notice how the pieces are different sizes. Before adding them, we have to slice them into twelfths so all pieces match!',
-                'duration' => '5 minutes',
-            ],
-            'privacy_notice' => 'WhyWrong never ranks children or compares scores with peers. Progress focuses on concepts mastered.',
+            'help_at_home' => $home,
+            'privacy_notice' => 'This note is only for your linked child. It uses accepted ideas, and it does not rank children.',
+            'is_demo' => false,
         ];
+
+        $weekStart = date('Y-m-d', strtotime('monday this week'));
+        try {
+            $existing = $this->db->fetchOne(
+                "SELECT id FROM parent_digests WHERE student_id = ? AND week_start = ? LIMIT 1",
+                [$studentId, $weekStart]
+            );
+            $payload = json_encode($summaryData, JSON_UNESCAPED_UNICODE);
+            if ($existing) {
+                $this->db->execute(
+                    "UPDATE parent_digests SET summary_json = ?, generated_by = 'template' WHERE id = ?",
+                    [$payload, $existing['id']]
+                );
+            } else {
+                $this->db->execute(
+                    "INSERT INTO parent_digests (id, student_id, week_start, summary_json, generated_by)
+                     VALUES (?, ?, ?, ?, 'template')",
+                    ['dig-' . bin2hex(random_bytes(8)), $studentId, $weekStart, $payload]
+                );
+            }
+        } catch (\Throwable $e) {}
 
         $response->json(['status' => 'success', 'summary' => $summaryData]);
     }

@@ -1,20 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SubjectCard } from '../../components/ui/SubjectCard';
 import { Card } from '../../components/ui/Card';
-import { Sparkles, ArrowRight, Brain, Clock, Award } from 'lucide-react';
+import { Sparkles, ArrowRight, Clock } from 'lucide-react';
 import type { Subject } from '../../types';
+import { api } from '../../services/api';
+import type { AssignedWork } from '../quiz/QuizFlow';
 
 interface StudentDashboardProps {
   subjects: Subject[];
+  learnerName?: string;
   onSelectSubject: (subjectSlug: string) => void;
   onOpenQuickQuiz: () => void;
+  onOpenAssignment?: (work: AssignedWork) => void;
+}
+
+function formatDue(value?: string | null): string {
+  if (!value) return 'No due date';
+  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   subjects,
+  learnerName = 'there',
   onSelectSubject,
   onOpenQuickQuiz,
+  onOpenAssignment,
 }) => {
+  const [work, setWork] = useState<AssignedWork[]>([]);
+
+  useEffect(() => {
+    api.listMyWork()
+      .then((res) => setWork(res.assignments || []))
+      .catch(() => setWork([]));
+  }, []);
   // 9 Pastel Colors for the 3x3 grid from section 4.1
   const defaultPastels = [
     { slug: 'mathematics', name: 'Mathematics', desc: 'Fractions, Equations, Geometry & Proportions', icon: 'Sigma', color: '#D9C2FC' },
@@ -37,7 +57,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-[#22D3EE]" /> Diagnostic Studio Active
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-display">
-            Welcome back, Kofi!
+            Welcome back, {learnerName}
           </h1>
           <p className="text-sm text-slate-100/90 leading-relaxed">
             Ready to test your thinking? We look behind wrong answers to discover the mental rule you were using, so you never make that mistake again.
@@ -49,7 +69,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           onClick={onOpenQuickQuiz}
           className="relative z-10 px-6 py-3.5 rounded-2xl bg-white text-[#734DFD] font-bold text-sm shadow-lg hover:bg-slate-50 transition-all flex items-center gap-2 shrink-0 active:scale-95"
         >
-          <span>Continue Fraction Quiz</span>
+          <span>Open a case</span>
           <ArrowRight className="w-4 h-4" />
         </button>
 
@@ -87,28 +107,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       </div>
 
       {/* Recent Activity Card */}
-      <Card variant="student" className="p-6">
-        <h3 className="font-bold text-base text-slate-900 font-display mb-4 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-[#734DFD]" /> Active Diagnostic Target
+      <Card variant="student" className="p-6 space-y-3">
+        <h3 className="font-bold text-base text-slate-900 font-display flex items-center gap-2">
+          <Clock className="w-4 h-4 text-[#734DFD]" /> Work from your teacher
         </h3>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl bg-[#F3F5FD] border border-slate-200/60 gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-[#734DFD]/10 text-[#734DFD] flex items-center justify-center font-bold">
-              <Brain className="w-5 h-5" />
-            </div>
+        {work.length === 0 && (
+          <p className="text-sm text-slate-600">No assigned question yet. You can still open a subject case. One wrong answer stays suspected until a teacher decides.</p>
+        )}
+        {work.map((item) => (
+          <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#F3F5FD] border border-slate-200/60">
             <div>
-              <p className="text-sm font-bold text-slate-800">Fractions: Addition with Unequal Denominators</p>
-              <p className="text-xs text-slate-500">Suspected rule: "Add tops, add bottoms" (1/3 + 1/4 = 2/7)</p>
+              <p className="text-sm font-bold text-slate-800">{item.title}</p>
+              <p className="text-xs text-slate-500">{item.subject_label} · due {formatDue(item.due_at)}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => onOpenAssignment?.(item)}
+              className="px-4 py-2 rounded-xl bg-[#734DFD] text-white text-xs font-semibold"
+            >
+              Answer this
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onOpenQuickQuiz}
-            className="px-4 py-2 rounded-xl bg-[#734DFD] text-white text-xs font-semibold hover:bg-[#5F37F3] transition-colors shrink-0"
-          >
-            Review Probe & Practice
-          </button>
-        </div>
+        ))}
       </Card>
     </div>
   );

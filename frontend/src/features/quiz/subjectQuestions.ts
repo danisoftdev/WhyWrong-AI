@@ -79,14 +79,13 @@ export const SUBJECT_QUIZ_CONFIGS: Record<string, SubjectQuizConfig> = {
       },
     },
     probe: {
-      prompt: 'Is \\frac{1}{2} + \\frac{1}{2} equal to \\frac{2}{4}?',
+      prompt: 'Is 1/2 + 1/2 equal to 2/4?',
       options: [
-        { id: 'p-opt-a', text: '\\frac{2}{15}', label: 'A', note: 'Predicted wrong rule' },
-        { id: 'p-opt-b', text: '\\frac{3}{10}', label: 'B', note: 'Correct sum' },
-        { id: 'p-opt-c', text: '\\frac{2}{10}', label: 'C', note: 'Slip' },
-        { id: 'p-opt-d', text: "I'm not sure", label: 'D', note: 'Unsure' },
+        { id: 'p-opt-a', text: 'Yes. 1/2 + 1/2 = 2/4', label: 'A', note: 'Predicted wrong rule' },
+        { id: 'p-opt-b', text: 'No. 1/2 + 1/2 = 1', label: 'B', note: 'Correct' },
+        { id: 'p-opt-c', text: "I'm not sure", label: 'C', note: 'Unsure' },
       ],
-      defaultProbeId: 'p-opt-a',
+      defaultProbeId: '',
     },
     remediation: {
       counterexampleTitle: "The Counterexample: Why you can't just add across",
